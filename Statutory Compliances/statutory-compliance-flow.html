@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Statutory Compliance Flow</title>
+    <!-- Include Mermaid.js from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true });
+    </script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        p {
+            color: #666;
+            text-align: center;
+            font-size: 16px;
+        }
+        .mermaid {
+            display: flex;
+            justify-content: center;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div style="padding: 15px 20px; background-color: #f8fafc; border-bottom: 1px solid #e2e8f0; margin-bottom: 20px;">
+        <a href="../dashboard.html" style="text-decoration: none; color: #475569; font-weight: 600; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: inline-flex; align-items: center; gap: 8px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+            Back to Dashboard
+        </a>
+    </div>
+
+<div class="container">
+    <h1>Statutory Compliance Process Flow</h1>
+    <p>This diagram illustrates the data flow for EPF, ESIC, and LWF compliance reporting.</p>
+    
+    <!-- Mermaid Diagram Definition -->
+    <div class="mermaid">
+        flowchart TD
+            Start([User Requests Compliance Report<br/>EPF / ESIC / LWF]) --> ActionChoice{Which Action is Requested?}
+            
+            %% Action Paths
+            ActionChoice -- "DisplayReport" --> PrepDisplay[Prepare Query for Displaying Data]
+            ActionChoice -- "DownloadReport" --> PrepDownload[Prepare Query for Inserting & Returning Data]
+            ActionChoice -- "RetrieveProcessedReport" --> FetchProcessed[Fetch Already Processed Data]
+            ActionChoice -- "Demark" --> MarkDownloaded[Mark Challan as Downloaded]
+            ActionChoice -- "DisplayArrearChallan" --> PrepArrear[Prepare Arrear Challan Query]
+            
+            %% 1. DisplayReport & DownloadReport Logic
+            PrepDisplay & PrepDownload --> DataSources[(Data Sources)]
+            DataSources -.-> MasterEmp(<b>OpenAppointments</b><br/><i>Master Employee Info, UAN, ESIC No.</i>)
+            DataSources -.-> MonthlySal(<b>tbl_monthlysalary</b><br/><i>Current Monthly Wages</i>)
+            DataSources -.-> ArrearSal(<b>tbl_monthly_liability_salary</b><br/><i>Arear Salary & Adjustments</i>)
+            
+            DataSources --> FilterData[Filter Data]
+            FilterData --> F1[Filter by Month & Year]
+            FilterData --> F2[Filter by Valid Org Unit / IP]
+            FilterData --> F3[Exclude rejected/invalid wages]
+            FilterData --> F4[Filter by Report Type<br/>EPF > 0, ESIC > 0, LWF > 0]
+            
+            F4 --> CombineData[Combine and Aggregate Data]
+            CombineData --> MathCalc(<b>Mathematical Computations</b>)
+            MathCalc -.-> C1[Calc Gross, EPF, EPS, EDLI Wages]
+            MathCalc -.-> C2[Enforce Maximum Thresholds<br/>e.g. EPF/EPS limit of 15,000]
+            MathCalc -.-> C3[Calculate Difference EPF - EPS]
+            MathCalc -.-> C4[Calculate NCP Days<br/><i>Month Days - Paid Days</i>]
+            
+            MathCalc --> DisplayResult{Is Action Download?}
+            DisplayResult -- "No" --> RetDisplay([Return Calculated Report for Screen])
+            
+            %% 2. Download Report Specific Logic
+            DisplayResult -- "Yes" --> InsertStaging[Insert new Data into<br/><b>epfecrreport</b> table]
+            InsertStaging --> RetDownload([Return Calculated Report for Download])
+            
+            %% 3. Retrieve Processed Report Logic
+            FetchProcessed --> ProcessedTable(<b>epfecrreport</b>)
+            ProcessedTable --> JoinMaster[Join with OpenAppointments]
+            JoinMaster --> RetProcessed([Return Final Processed Data])
+            
+            %% 4. Demark Logic
+            MarkDownloaded --> InsertChallanDate[Insert into <b>tblpfchalandates</b><br/>indicating user downloaded the challan]
+            InsertChallanDate --> RetNull([Return Null/Success])
+    </div>
+</div>
+
+</body>
+</html>

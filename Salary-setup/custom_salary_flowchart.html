@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Custom Salary Structure Flowchart</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f9f9f9; padding: 20px; line-height: 1.6; color: #333; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #2c3e50; }
+        h3 { color: #2980b9; margin-top: 30px; border-bottom: 2px solid #eee; padding-bottom: 5px; }
+        h4 { color: #34495e; margin-bottom: 10px; margin-top: 20px; }
+        .mermaid { display: flex; justify-content: center; margin-top: 20px; margin-bottom: 40px; }
+        .description-box { background: #f8f9fa; border-left: 4px solid #3498db; padding: 20px; margin-top: 20px; border-radius: 4px; box-shadow: inset 0 0 10px rgba(0,0,0,0.02); }
+        ul { margin-top: 0; }
+        li { margin-bottom: 8px; }
+        a { color: #3498db; text-decoration: none; border-bottom: 1px dotted #3498db; }
+        a:hover { color: #2980b9; text-decoration: none; border-bottom: 1px solid #2980b9; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>
+        <a href="uspcreatecustomsalarystructure.sql" target="_blank" title="Click to view the SQL source file">uspcreatecustomsalarystructure.sql</a> 
+        <br><small style="color: #7f8c8d; font-size: 0.6em; border: none;">Execution Flow</small>
+    </h2>
+    
+    <!-- Mermaid Container ON TOP -->
+    <div class="mermaid">
+        graph TD
+            Start(["Start uspcreatecustomsalarystructure"]) --> Init("Fetch Basic Details & Meal Vouchers")
+            Init --> Appr{"Is Apprentice/Trainee?"}
+            
+            Appr -- "Yes" --> ApprCheck{"Any Compliances Enabled?<br>(PF, ESI, PT, LWF, Gratuity)"}
+            ApprCheck -- "Yes" --> ApprErr["Throw Error: Compliances not applicable for Apprentice"]
+            ApprCheck -- "No" --> C
+            
+            Appr -- "No" --> C
+            
+            C("Fetch Employer Compliance Config") --> D{"PF / ESI Already Triggered?"}
+            D -- "Yes & Opting Out" --> Err2["Throw Error: PF/ESI cannot be disabled mid-cycle"]
+            D -- "No / Valid" --> E("Process Variable & Fixed Deductions")
+            
+            E --> F[("Store JSON String into<br>Temporary DB Table<br>(tmpsalarycomponent)")]
+            
+            F --> G("Extract Gratuity Applicable Components<br>(Compare with Master Settings)")
+            G --> H("Process Component Totals<br>(Basic, HRA, Allowances, Transport, etc.)")
+            
+            H --> I{"Min Wages Applicable?"}
+            I -- "Yes (>20 Emp, No Compliances)" --> J{"Basic <= 15k OR <br>CTC < 17.4k?"}
+            J -- "Yes" --> Err3["Throw Error: Invalid MOP"]
+            J -- "No" --> K
+            I -- "No" --> K("Proceed")
+            
+            K --> L("Calculate LWF based on State & Frequency")
+            
+            L --> M{"ESI Opted or<br>Taxable Comp ≤ 21k?"}
+            M -- "Yes" --> N("Calculate ESI<br>Er: 3.25%, Ee: 0.75%")
+            M -- "No" --> O("ESI = 0")
+            
+            N --> P
+            O --> P
+            
+            P{"PF Opted?"}
+            P -- "Yes" --> Q("Calculate EPF <br>(Check EDLI + 15k Caps)")
+            P -- "No" --> R("EPF = 0")
+            
+            Q --> S
+            R --> S
+            
+            S("Calculate Gratuity (if opted)") --> T("Initial Net Pay & CTC Setup")
+            
+            T --> U{"Are Custom Business<br>Salary Heads Defined?"}
+            U -- "Yes" --> V("Loop Custom Heads & Recalculate Gross<br>(Sum only 'includedingross' = 'Y')")
+            U -- "No" --> W("Standard Standard Mapping Structure Calculation")
+            
+            V --> X
+            W --> X
+            
+            X("Deduct Final VPF, Charity, Deductions from Net Pay") --> Y[("Build JSON representation of all active components")]
+            
+            Y --> Z(["Return Output refcursor with 65+ calculated columns"])
+            
+            style ApprErr fill:#ffcccc,stroke:#cc0000,stroke-width:2px,color:#900
+            style Err2 fill:#ffcccc,stroke:#cc0000,stroke-width:2px,color:#900
+            style Err3 fill:#ffcccc,stroke:#cc0000,stroke-width:2px,color:#900
+            style Z fill:#d4f1f4,stroke:#05445E,stroke-width:2px
+    </div>
+
+    <!-- Description Container BELOW -->
+    <div class="description-box">
+        <p>This procedure is designed to dynamically accept a custom JSON payload defining an employee's salary breakdown, and securely translate it into a compliant, mathematically balanced gross/net salary structure.</p>
+
+        <h3>Phase 1: Setup, Safety, & Validation</h3>
+        <ul>
+            <li><b>Apprentice Validations:</b> If the employee's Job Type is 'Apprentice' or 'Trainee', the system acts aggressively: it forces all compliance (PF, ESI, PT, LWF, Gratuity) to be disabled. If any are opted in, it outright blocks execution and throws an error.</li>
+            <li><b>Lock-in Rules:</b> System queries historical generation tables. If PF or ESI was already generated for them in the past (or UAN/ESI numbers generated), they are blocked from disabling them now.</li>
+            <li><b>Deductions Cache:</b> Grabs required upfront deduction values (Meal Vouchers, Fixed and Variable quarterly/annual deductions, Taxable & Non-Taxable bonuses).</li>
+        </ul>
+
+        <h3>Phase 2: Data Extraction & Accumulation</h3>
+        <ul>
+            <li><b>JSON Unpacking:</b> The provided <code>p_salarystructure</code> parameter (which is a JSON string) is extracted directly into a temporary SQL table (<code>tmpsalarycomponent</code>) so SQL math functions can interact with the dynamic components natively.</li>
+            <li><b>Master Comparisons:</b> Loops against the core Employer setups to decide exactly which of those custom fields should attract Gratuity.</li>
+            <li><b>Summation Matrix:</b> Maps down column by column to extract explicit values for Basic, HRA, Target Allowances, Conveyance, Education Allowances, Overtime, Leave Encashment, etc.</li>
+        </ul>
+
+        <h3>Phase 3: Core Compliance Calculation</h3>
+        <ul>
+            <li><b>Minimum Wage Blocker:</b> For companies > 20 Employees who disable PF/ESI, the procedure enforces hard stops on Basic Pay (≤ ₹15k) and CTC (&lt; 17.4k).</li>
+            <li><b>State Demands:</b> Labour Welfare Fund (LWF) matching logic extracts employer and employee obligations divided by their frequency (monthly, annually, etc.).</li>
+            <li><b>ESI Logic:</b> Identifies all components marked as "Taxable". If their sum is ≤ ₹21,000, or the employee inherently triggers ESI, it calculates the ESI Employer (3.25%) and Ee (0.75%) figures.</li>
+            <li><b>Provident Fund (EPF):</b> Evaluates strictly selected "PF Applicable components" to safely calculate the 12% deduction, watching for EDLI overhead caps.</li>
+        </ul>
+
+        <h3>Phase 4: Synthesis & Output Compilation</h3>
+        <ul>
+            <li><b>Initial Wrap:</b> Mathematical summations compute straightforward Target CTC (Gross + Liabilities + Overheads). </li>
+            <li><b>Business Overrides (The V2.7 Fix):</b> Standard systems assume Gross is simply [Basic + HRA + Allowances]. Here, it checks if the Business Setup explicitly dictates which custom JSON components are counted as Gross (using <code>includedingross</code> flag).</li>
+            <li><b>Net Tuning & Charity:</b> Calculates Net Take-Home Pay. From there it explicitly scrubs Charitable contributions, Voluntary PF (VPF), and non-taxable bonuses.</li>
+            <li><b>Serialization:</b> Compiles all computed individual allowance objects back into a clean nested JSON object (`v_salarymasterjson`).</li>
+            <li><b>Conclusion:</b> Spits out the massive <code>refcursor</code> structure containing all ~65 variables necessary to commit the setup to the database.</li>
+        </ul>
+    </div>
+</div>
+
+<!-- Import Mermaid.js script to render the graph automatically -->
+<script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, theme: 'default' });
+</script>
+
+</body>
+</html>

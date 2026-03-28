@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TankhaPay Payrolling Analysis Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8fafc;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --accent-1: #4f46e5;
+            --accent-2: #7c3aed;
+            --accent-3: #db2777;
+            --glass-bg: rgba(255, 255, 255, 0.9);
+            --glass-border: rgba(0, 0, 0, 0.05);
+            --glass-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.05);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Abstract Background */
+        .bg-layer {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: -2;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(236, 72, 153, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.1) 0%, transparent 60%);
+            animation: bgShift 15s ease-in-out infinite alternate;
+        }
+
+        @keyframes bgShift {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.1); }
+        }
+
+        /* Ambient Orbs */
+        .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            z-index: -1;
+            opacity: 0.6;
+            animation: float 12s ease-in-out infinite;
+        }
+        .orb-1 {
+            width: 350px; height: 350px;
+            background: var(--accent-1);
+            top: 5%; left: 15%;
+        }
+        .orb-2 {
+            width: 450px; height: 450px;
+            background: var(--accent-2);
+            bottom: 5%; right: 10%;
+            animation-delay: -4s;
+        }
+        .orb-3 {
+            width: 300px; height: 300px;
+            background: var(--accent-3);
+            top: 35%; right: 40%;
+            animation-delay: -8s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-40px) scale(1.05); }
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 4rem 2rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 4rem;
+            animation: fadeInDown 1s ease-out forwards;
+        }
+
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        header .icon-wrap {
+            display: inline-flex;
+            width: 80px; height: 80px;
+            border-radius: 20px;
+            background: linear-gradient(135deg, var(--accent-1), var(--accent-3));
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 10px 25px rgba(99, 102, 241, 0.4);
+            color: white;
+            animation: pulse 3s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.6); }
+            70% { box-shadow: 0 0 0 20px rgba(99, 102, 241, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+        }
+
+        h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            background: linear-gradient(to right, #1e293b, #475569);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 1rem;
+            letter-spacing: -0.5px;
+        }
+
+        p.subtitle {
+            font-size: 1.2rem;
+            color: var(--text-muted);
+            max-width: 650px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+            gap: 2rem;
+        }
+
+        .category-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 2rem;
+            box-shadow: var(--glass-shadow);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            opacity: 0;
+            transform: translateY(40px);
+            animation: fadeInUp 0.8s ease-out forwards;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .category-card::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 4px;
+            background: linear-gradient(90deg, var(--card-color-1), var(--card-color-2));
+            opacity: 0.8;
+        }
+
+        /* Staggered animation */
+        .category-card:nth-child(1) { animation-delay: 0.1s; --card-color-1: #6366f1; --card-color-2: #8b5cf6; }
+        .category-card:nth-child(2) { animation-delay: 0.2s; --card-color-1: #10b981; --card-color-2: #34d399; }
+        .category-card:nth-child(3) { animation-delay: 0.3s; --card-color-1: #f59e0b; --card-color-2: #fbbf24; }
+        .category-card:nth-child(4) { animation-delay: 0.4s; --card-color-1: #ef4444; --card-color-2: #f87171; }
+        .category-card:nth-child(5) { animation-delay: 0.5s; --card-color-1: #8b5cf6; --card-color-2: #c084fc; }
+        .category-card:nth-child(6) { animation-delay: 0.6s; --card-color-1: #ec4899; --card-color-2: #f472b6; }
+        .category-card:nth-child(7) { animation-delay: 0.7s; --card-color-1: #0ea5e9; --card-color-2: #38bdf8; }
+
+        @keyframes fadeInUp {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .category-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 40px -12px rgba(0,0,0,0.1);
+            border-color: rgba(0,0,0,0.08);
+            background: rgba(255, 255, 255, 1);
+        }
+
+        .category-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .category-icon {
+            width: 52px;
+            height: 52px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            margin-right: 1.2rem;
+            background: rgba(0,0,0,0.03);
+            color: var(--card-color-1);
+            transition: all 0.3s ease;
+        }
+
+        .category-card:hover .category-icon {
+            background: linear-gradient(135deg, var(--card-color-1), var(--card-color-2));
+            color: white;
+            transform: scale(1.1) rotate(5deg);
+        }
+
+        .category-title {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: var(--text-main);
+            letter-spacing: 0.5px;
+        }
+
+        .file-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+        }
+
+        .file-link {
+            display: flex;
+            align-items: center;
+            padding: 1rem 1.2rem;
+            background: rgba(0,0,0,0.02);
+            border-radius: 12px;
+            text-decoration: none;
+            color: var(--text-muted);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            border: 1px solid transparent;
+        }
+
+        .file-link::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; bottom: 0; width: 3px;
+            background: linear-gradient(to bottom, var(--card-color-1), var(--card-color-2));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .file-link:hover {
+            background: rgba(0,0,0,0.04);
+            color: var(--text-main);
+            transform: translateX(6px);
+            border-color: rgba(0,0,0,0.06);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        .file-link:hover::before {
+            opacity: 1;
+        }
+
+        .file-link i.fa-file-code {
+            margin-right: 12px;
+            font-size: 1.1rem;
+            color: rgba(0,0,0,0.3);
+            transition: color 0.3s ease;
+        }
+
+        .file-link:hover i.fa-file-code {
+            color: var(--card-color-1);
+        }
+
+        .file-link span {
+            font-weight: 400;
+            flex-grow: 1;
+            font-size: 1rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .file-link i.fa-chevron-right {
+            opacity: 0;
+            transform: translateX(-10px);
+            transition: all 0.3s ease;
+            color: var(--card-color-1);
+            font-size: 0.9rem;
+        }
+
+        .file-link:hover i.fa-chevron-right {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        footer {
+            margin-top: 5rem;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            animation: fadeInDown 1s ease-out 1s forwards;
+            opacity: 0;
+            padding-bottom: 2rem;
+        }
+
+        @media (max-width: 768px) {
+            h1 { font-size: 2.5rem; }
+            .dashboard-grid { grid-template-columns: 1fr; }
+            .container { padding: 2rem 1rem; }
+            .orb { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Removed complex animated backgrounds for simplicity -->
+
+    <div class="container">
+        <header>
+            <div class="icon-wrap">
+                <i class="fa-solid fa-chart-network"></i>
+            </div>
+            <h1>TankhaPay Payrolling Analysis</h1>
+            <p class="subtitle">A centralized hub for all flowchart models, data flow analyses, and architectural documentation regarding the database handover project.</p>
+        </header>
+
+        <div class="dashboard-grid">
+            
+            <!-- Employee Life Cycle -->
+            <div class="category-card">
+                <div class="category-header">
+                    <div class="category-icon">
+                        <i class="fa-solid fa-users-gear"></i>
+                    </div>
+                    <div class="category-title">Employee Life Cycle</div>
+                </div>
+                <div class="file-list">
+                    <a href="./employee-life-cycle-/employee-lifecycle-flowchart-1.html" class="file-link">
+                        <i class="fa-regular fa-file-code"></i>
+                        <span>Lifecycle Flowchart 1</span>
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </a>
+                    <a href="./employee-life-cycle-/detailed-lifecycle-flowchart-2.html" class="file-link">
+                        <i class="fa-regular fa-file-code"></i>
+                        <span>Detailed Lifecycle Flowchart 2</span>
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </a>
+                    <a href="./employee-life-cycle-/detailed-lifecycle-flowchart-3.html" class="file-link">
+                        <i class="fa-regular fa-file-code"></i>
+                        <span>Detailed Lifecycle Flowchart 3</span>
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Salary Setup -->
+            <div class="category-card">
+                <div class="category-header">
+                    <div class="category-icon">
+                        <i class="fa-solid fa-money-check-dollar"></i>
+                    </div>
+                    <div class="category-title">Salary Setup</div>
+                </div>
+                <div class="file-list">
+                    <a href="./Salary-setup/salary_setup_flow.html" class="file-link">
+                        <i class="fa-regular fa-file-code"></i>
+                        <span>Salary Setup Flow</span>
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </a>
+                    <a href="./Salary-setup/Salary_Structure_Analysis.html" class="file-link">
+                        <i class="fa-regular fa-file-code"></i>
+                        <span>Salary Structure Analysis</span>
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Attendance Approval -->
+            <div class="category-card">
+                <div class="category-header">
+                    <div class="category-icon">
+                        <i class="fa-solid fa-calendar-check"></i>
+                    </div>
+                    <div class="category-title">Attendance Approval</div>
+                </div>
+                <div class="file-list">
+                    <a href="./attendnaceapproval/uspsavebulkattendance_business_flowchart.html" class="file-link">
+                        <i class="fa-regular fa-file-code"></i>
+                        <span>Bulk Attendance Processing</span>
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </a>
+                    <a href="./attendnaceapproval/uspsavebulkattendance_business_drilldown_flowchart.html" class="file-link">
+                        <i class="fa-regular fa-file-code"></i>
+                        <span>Approval Drill-Down Flowchart</span>
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Salary Generation -->
+            <div class="category-card">
+                <div class="category-header">
+                    <div class="category-icon">
+                        <i class="fa-solid fa-file-invoice-dollar"></i>
+                    </div>
+                    <div class="category-title">Salary Generation</div>
+                </div>
+                <div class="file-list">
+                    <a href="./Salary-Generation/salary_generation_flow.html" class="file-link">
+                        <i class="fa-regular fa-file-code"></i>
+                        <span>Salary Generation Flow</span>
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </a>
+                    <a href="./Salary-Generation/uspgetincrementdiff_flowchart.html" class="file-link">
+                        <i class="fa-regular fa-file-code"></i>
+                        <span>Increment Arrears Flowchart</span>
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Billing Process -->
+            <div class="category-card">
+                <div class="category-header">
+                    <div class="category-icon">
+                        <i class="fa-solid fa-receipt"></i>
+                    </div>
+                    <div class="category-title">Billing Process</div>
+                </div>
+                <div class="file-list">
+                    <a href="./Billing Process/billing-process-flow.html" class="file-link">
+                        <i class="fa-regular fa-file-code"></i>
+                        <span>Billing Process Flow</span>
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Shift Management -->
+            <div class="category-card">
+                <div class="category-header">
+                    <div class="category-icon">
+                        <i class="fa-solid fa-business-time"></i>
+                    </div>
+                    <div class="category-title">Shift Management</div>
+                </div>
+                <div class="file-list">
+                    <a href="./Shift-management/shift-management-flowchart.html" class="file-link">
+                        <i class="fa-regular fa-file-code"></i>
+                        <span>Shift Management Flowchart</span>
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </a>
+                    <a href="./Shift-management/attendance-flowchart.html" class="file-link">
+                        <i class="fa-regular fa-file-code"></i>
+                        <span>Attendance Flowchart</span>
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Tax Calculation -->
+            <div class="category-card">
+                <div class="category-header">
+                    <div class="category-icon">
+                        <i class="fa-solid fa-calculator"></i>
+                    </div>
+                    <div class="category-title">Tax Calculation</div>
+                </div>
+                <div class="file-list">
+                    <a href="./Tax Calculation/tax-calculation-flow.html" class="file-link">
+                        <i class="fa-regular fa-file-code"></i>
+                        <span>Tax Calculation Flow</span>
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Statutory Compliances -->
+            <div class="category-card">
+                <div class="category-header">
+                    <div class="category-icon">
+                        <i class="fa-solid fa-scale-balanced"></i>
+                    </div>
+                    <div class="category-title">Statutory Compliances</div>
+                </div>
+                <div class="file-list">
+                    <a href="./Statutory Compliances/statutory-compliance-flow.html" class="file-link">
+                        <i class="fa-regular fa-file-code"></i>
+                        <span>Statutory Compliance Flow</span>
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </a>
+                </div>
+            </div>
+
+        </div>
+        
+        <footer>
+            <p>&copy; 2026 Database Handover Documentation &bull; Generated Architecture Analysis</p>
+        </footer>
+    </div>
+</body>
+</html>

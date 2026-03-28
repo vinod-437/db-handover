@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salary Structure Database Analysis</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 20px;
+            padding: 0 20px;
+            max-width: 1000px;
+            margin: auto;
+            color: #333;
+        }
+        h1, h2, h3 {
+            color: #0056b3;
+        }
+        pre {
+            background-color: #f4f4f4;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        .mermaid {
+            margin-bottom: 20px;
+        }
+    </style>
+    <!-- Include Mermaid JS -->
+    <script type="module">
+      import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+      mermaid.initialize({ startOnLoad: true });
+    </script>
+</head>
+<body>
+    <div style="padding: 15px 20px; background-color: #f8fafc; border-bottom: 1px solid #e2e8f0; margin-bottom: 20px;">
+        <a href="../dashboard.html" style="text-decoration: none; color: #475569; font-weight: 600; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: inline-flex; align-items: center; gap: 8px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+            Back to Dashboard
+        </a>
+    </div>
+
+    <h1>Detailed Salary Structure Database Analysis</h1>
+
+    <h2>1. Database Entity Relationship Diagram (ERD)</h2>
+    <p>The following is a comprehensive ERD mapping the foreign keys and core transaction structures.</p>
+
+    <div class="mermaid">
+    erDiagram
+        %% Core Entities
+        openappointments {
+            int emp_id PK
+            bigint emp_code
+            varchar minwagesstate
+            int appointment_status_id
+            varchar gender
+        }
+
+        empsalaryregister {
+            int id PK
+            int appointment_id FK "References openappointments(emp_id)"
+            double_precision basic "Core salary"
+            double_precision hra "House Rent"
+            double_precision allowances "Other allowances"
+            double_precision gross "Gross Salary"
+            double_precision ctc "Total Cost to Company"
+            double_precision salaryinhand "Net Pay"
+            double_precision employerepfrate "Employer EPF"
+            double_precision employeresirate "Employer ESI"
+            double_precision employeeepfrate "Employee EPF"
+            double_precision employeeesirate "Employee ESI"
+            double_precision pt "Professional Tax"
+            double_precision employerlwf "Employer LWF"
+            double_precision employeelwf "Employee LWF"
+            varchar isactive "Flag to map current active row"
+        }
+        
+        mst_otherduction {
+            int id PK
+            varchar deduction_name "E.g. Meal Voucher, Medical"
+            varchar transactiontype "Debit or Credit"
+            bit is_taxable
+            varchar applicationtype
+        }
+        
+        trn_candidate_otherduction {
+            int id PK
+            int candidate_id FK "References openappointments(emp_id)"
+            int deduction_id FK "References mst_otherduction(id)"
+            bigint salaryid FK "References empsalaryregister(id)"
+            double_precision deduction_amount
+            varchar deduction_frequency "Monthly, Annually"
+            varchar includedinctc "Yes/No flag"
+        }
+
+        tbl_account {
+            bigint id PK
+            varchar compliancemodeltype
+            int number_of_employees
+            varchar minwagestatus
+        }
+
+        mst_employer_compliance_settings {
+            int id PK
+            bigint customer_account_id FK "Ref tbl_account"
+            varchar employerpfincludeinctc
+            varchar edli_adminchargesincludeinctc
+            varchar pfcapapplied
+        }
+
+        %% Relationships
+        openappointments ||--o{ empsalaryregister : "Has Salary Details"
+        openappointments ||--o{ trn_candidate_otherduction : "Has Deductions/Allowances"
+        empsalaryregister ||--o{ trn_candidate_otherduction : "Groups Deductions for Salary Month"
+        mst_otherduction ||--o{ trn_candidate_otherduction : "Types of Deductions"
+        tbl_account ||--o{ mst_employer_compliance_settings : "Employer Setup"
+    </div>
+
+    <hr>
+
+    <h2>2. Process Flowchart: <code>uspcreatecustomsalarystructure</code></h2>
+    <p>This function is responsible for building the customized breakdown when provided explicit parameters (often a JSON array of specific components).</p>
+
+    <div class="mermaid">
+    flowchart TD
+        Start([Execute uspcreatecustomsalarystructure])
+        Input[Get Appointment ID, Customer ID, CTC, Components JSON]
+        CheckApprentice{Is Apprentice?}
+        
+        CheckApprentice -->|Yes| DisableStatutory[Disable PT, LWF, PF, ESI, Gratuity]
+        CheckApprentice -->|No| FetchCompliance[Fetch Employer Compliance Settings e.g., EDLI Admin Charges included in CTC?]
+        DisableStatutory --> FetchCompliance
+
+        FetchCompliance --> Val[Validate PF / ESI Settings vs Existing Salary records]
+        
+        Val --> SumDeductions[Sum Other Deductions & Variables from trn_candidate_otherduction Ex. Meal Vouchers, Monthly Taxable Bonus]
+        
+        SumDeductions --> ParseJSON{Parse Expected Components p_salarystructure JSON}
+        
+        ParseJSON --> DeriveBase[Extract Basic, HRA, Conveyance, Allowances, etc.]
+        
+        DeriveBase --> CheckComplianceApplicability{Is LWF / ESI / PF Applicable?}
+        
+        CheckComplianceApplicability --> CalcStatutory[Calculate ESI Employer/Employee Rates Calculate EPF Employer/Employee Rates based on Cap Rules]
+        
+        CalcStatutory --> CalculateGross[Sum Base components to calculate GROSS]
+        
+        CalculateGross --> CalculateTaxNet[Calculate CTC = Gross + ER_Statutory Calculate Net In Hand = Gross - EE_Statutory - Deductions]
+
+        CalculateTaxNet --> FormatOutput[Format Result Array and Return Set/Recordset]
+        FormatOutput --> End([End Procedure Execution])
+    </div>
+
+    <hr>
+
+    <h2>3. Process Flowchart: <code>uspccalcgrossfromctc_withoutconveyance</code></h2>
+    <p>This function is a reverse-calculator. Given a target CTC, it figures out the basic pay, statutory compliances, and balances out <code>allowances</code> to precisely match the target CTC.</p>
+
+    <div class="mermaid">
+    flowchart TD
+        Start([Execute uspccalcgrossfromctc_withoutconveyance])
+        InputCTC[Input Target CTC: p_monthlyofferedpackage, basic option]
+        
+        LoadEnv[Load Compliance Models, State Mins, PF Cap Rules]
+        LoadEnv --> PreTaxSum[Sum Candidate Specific Other Deductions/Variables]
+        
+        PreTaxSum --> DetermineBasic{Basic Option Selected?}
+        DetermineBasic -->|Option 1 or 5| StandardBasic[Derive Base=CTC/Certain % and Calculate HRA]
+        DetermineBasic -->|Option 2| FixedBasic[Use Provided Basic and Set HRA/Allowances = 0]
+        
+        StandardBasic --> InitStat1[Init EPF: Calculate Employer & Employee EPF 12-13%]
+        FixedBasic --> InitStat1
+        
+        InitStat1 --> InitStat2[Init NPS & Govt Bonus if opted]
+        
+        InitStat2 --> ESICheck{Is ESI Applicable?}
+        ESICheck -->|Yes| RevCalcESI[Reverse Calculate ESI: Gross = TargetCTC - ER_EPF - ER_LWF / 1.0325 Allowances = Gross - Basic - HRA]
+        ESICheck -->|No| RevCalcNormal[Normal Calculation: Gross = TargetCTC - ER_EPF - ER_LWF Allowances = Gross - Basic - HRA]
+        
+        RevCalcESI --> ComputeStatutory[Calculate Explicit ESI 3.25% & 0.75% locally]
+        RevCalcNormal --> ComputeStatutory
+        
+        ComputeStatutory --> CalcTaxes[Calculate Gratuity, LWF, Professional Tax based on Target Gross]
+        
+        CalcTaxes --> FinalizePay[Calculate Final Net Salary In Hand & Confirm Target CTC match]
+        
+        FinalizePay --> OutputSet[Assemble Final Response RefCursor Row]
+        OutputSet --> End([End Procedure Execution])
+    </div>
+
+    <hr>
+
+    <h2>4. Process Flowchart: <code>uspsavecustomsalarystructure</code></h2>
+    <p>This flowchart handles what happens when a computed salary is formally saved to the employee database.</p>
+
+    <div class="mermaid">
+    flowchart TD
+        Start([Execute uspsavecustomsalarystructure])
+        Input[Takes exact values derived from previous procs]
+        
+        Input --> HistoryCheck{Does Employee have Active Salary?}
+        HistoryCheck -->|Yes| DisableOld[Update empsalaryregister Set isactive='0' Set effectiveto = effectivedate - 1 day]
+        HistoryCheck -->|No| SaveNew[Skip to Save]
+        
+        DisableOld --> SaveNew
+        
+        SaveNew --> InsertSalary[INSERT INTO empsalaryregister WITH isactive='1']
+        
+        InsertSalary --> LinkOther[Update trn_candidate_otherduction Set salaryid = New Salary Record ID]
+        
+        LinkOther --> SetupLeaves[Generate / Update leave templates in tbl_tpemp_leavetemplates based on parameters]
+        
+        SetupLeaves --> CheckEmployee{Is candidate mapped as Employee?}
+        CheckEmployee -->|No| GenerateEmpCode[Generate openappointments emp_code, Create System User & Profile]
+        GenerateEmpCode --> FinalUpdate[Update openappointments status and links]
+        CheckEmployee -->|Yes| FinalUpdate
+        
+        FinalUpdate --> End([Return Final Success Row JSON])
+    </div>
+</body>
+</html>

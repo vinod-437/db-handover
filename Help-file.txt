@@ -1,0 +1,43 @@
+Here are the corresponding database functions and key queries used for each of the APIs you mentioned, based on the backend codebase (tpay-business-hub-api):
+
+1. uspccalcgrossfromctc_withoutconveyance
+DB Function Used: public.uspccalcgrossfromctc_withoutconveyance()
+File: src/services/employee/employeeService.js (and src/controllers/manage-employee/employeeSetupController.js)
+Description: This function calculates the gross salary from CTC (excluding conveyance) and returns a cursor containing the detailed salary breakdown.
+2. createCustomSalaryStructure
+DB Function Used: public.uspcreatecustomsalarystructure()
+File: src/controllers/manage-employee/employeeSetupController.js
+Description: This function creates and calculates the custom salary structure for an employee based on the provided inputs (basic, options, PF opted, etc.) before saving it.
+3. saveCustomSalaryStructure
+DB Function Used: public.uspsavecustomsalarystructure()
+File: src/services/employee/employeeService.js (and employeeSetupController.js)
+Description: This function saves the custom salary structure calculated from the previous step into the database. It handles all statutory components (PF, ESI, PT, LWF, etc.) and updates the employee's salary record.
+4. updateJoiningStatus
+DB Interaction / External API Call:
+File: src/services/candidate/candidateService.js (inside saveTpCandidateSalary and joinTpAttendanceCandidate)
+Description: There isn't a direct local database function for this. Instead, the backend makes an external HTTP POST request to the CRM API endpoint (https://1akal.in/crm_api/Hub_placed_activity/Updatejoiningstatus or process.env.CRM_URL + "Hub_placed_activity/Updatejoiningstatus") to update the joining status (eccode_issued).
+Note: Upon a successful response from the CRM, it optionally runs the query: UPDATE users SET dataposted = 'Y' WHERE Emp_Code = :hub_emp_code.
+5. getAppointeeDetails
+DB Functions / Queries Used:
+uspprocesslwfrates(p_action=>'GetStates') — Fetches the states master list.
+get_tp_employee_details(p_action=>'GetEmployeeDetailsByEmpId', p_employee_id=>...) — Fetches candidate basic details.
+File: src/services/candidate/candidateService.js
+Description: It also executes a few raw queries such as calculating emp_id from openappointments based on emp_code or js_id, and retrieving deductions from the mst_otherduction table.
+6. getTpCandidateDetails
+DB Function Used: public.get_tp_employee_details(p_action=>'GetEmployeeDetailsByEmpId', p_employee_id=>...)
+File: src/services/candidate/candidateService.js
+Description: Triggers a stored procedure (the identical one used in appointee details) to fetch all underlying personal and professional profile details of the candidate from multiple joined tables.
+7. getSalaryStructure
+DB Functions Used:
+public.uspprocesssalarystructure(p_appointment_id => $1, p_action => $2) — Retrieves the generated salary structure.
+public.getdeductionsbyempid(p_emp_id => $1, p_salary_mode => $2) — Retrieves corresponding other deductions for that candidate.
+File: src/services/employee/employeeService.js
+Description: Both functions return a cursor to fetch the exact breakdown and deductions of the candidate's latest configured salary structure.
+
+
+
+Explanation of the Sequence Matrix
+Initial Mount (Initialization): As soon as the page opens, it aggressively pulls down all candidate info, master dropdowns, and summaries (getAppointeeDetails, getTpCandidateDetails, getEmpSummary, GetMinWageCategoryByState). If it's returning to an already set-up employee, it runs getSalaryStructure to prepopulate the grid.
+"Calculate" Action (Drafting): When you type a package amount in the UI and test it, it calls either uspccalcgrossfromctc_withoutconveyance or createCustomSalaryStructure depending on the toggle chosen. These APIs return temporary arrays to display to the user without formally saving.
+"Save" Action (Committing): When you click save, the payload heads up to saveCustomSalaryStructure. Right before the backend replies "Success" to the webpage, it fires off updateJoiningStatus externally to register the employee with the .NET CRM.
+Final Presentation: The UI automatically refreshes itself to display the officially saved table layout by invoking getSalaryStructure once more.

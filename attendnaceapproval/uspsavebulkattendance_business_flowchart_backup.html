@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>uspsavebulkattendance_business Flowchart</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background-color: #f4f7f6; color: #333; }
+        .container { max-width: 1200px; margin: auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #2c3e50; margin-bottom: 5px; }
+        p.subtitle { text-align: center; color: #7f8c8d; margin-bottom: 30px; }
+        .mermaid { display: flex; justify-content: center; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="margin-bottom: 20px;">
+            <a href="../dashboard.html" style="display: inline-block; padding: 10px 20px; background-color: #3498db; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">&larr; Back to Dashboard</a>
+        </div>
+        <h1>uspsavebulkattendance_business</h1>
+        <p class="subtitle">Bulk Attendance Processing & Approval Routing</p>
+        
+        <div class="mermaid">
+            graph TD
+                A([Start: uspsavebulkattendance_business]) --> B[Fetch Custom Month Settings <br>for Customer Account]
+                B --> C{Check Action}
+                
+                %% Branch 1: ApproveBulkAttendanceFromExcel_New
+                C -- ApproveBulkAttendanceFromExcel_New --> D1[Parse JSON & Determine Payroll Dates]
+                D1 --> D2[Bulk Approve Attendance skipping Locked/Paid records]
+                D2 --> D3[Calculate & Apply Late Coming/Early Going Fines into Ledger]
+                D3 --> Z1([Return Success Message])
+                
+                %% Branch 2: ApproveBulkAttendanceFromExcel
+                C -- ApproveBulkAttendanceFromExcel --> E1[Iterate over Employees from JSON]
+                E1 --> E2{Is Payment Advice Locked?}
+                E2 -- Yes --> E3[Skip Employee]
+                E2 -- No --> E4[Approve Attendance & Apply Fines]
+                E4 --> E5[Trigger Pregenerate Wages & Update TA on Advice]
+                E5 --> E1
+                E1 -.-> Z2([Return Summary Message])
+                
+                %% Branch 3: SaveBulkAttendance
+                C -- SaveBulkAttendance --> F1[Populate Temp Tables from JSON]
+                F1 --> F2[Clean draft advices & non-permanent ledgers]
+                F2 --> F3[Insert/Update tbl_monthly_attendance tagging Paid/Unpaid categories]
+                F3 --> F4[Trigger Alerts to Employer if Employee Marker]
+                F4 --> F5[Trigger Pregenerate Wages]
+                F5 --> Z3([Return Status])
+                
+                %% Branch 4: Approve / Lock Attendance
+                C -- ApproveBulkAttendance or LockAttendance --> G1[Validate MP prior Status & Lock Status]
+                G1 --> G2[Approve Attendance dates for Employee]
+                G2 --> G3[Calculate & Apply Fines into General Ledger]
+                G3 --> G4[Trigger Pregenerate Wages]
+                G4 --> G5{Is Action LockAttendance?}
+                G5 -- Yes --> G6[Execute uspcreatewagesfromattendance to finalize]
+                G6 --> Z4([Return Success])
+                G5 -- No --> Z4
+                
+                %% Branch 5: Pay Salary
+                C -- PaySalary --> H1[Iterate valid active employees for Payment Period]
+                H1 --> H2{Flexi Attendance Applicable?}
+                H2 -- Yes --> H3[Execute uspcreatewagesfromflexiattendance]
+                H2 -- No --> H4[Execute uspcreatewagesfromattendance]
+                H3 --> H1
+                H4 --> H1
+                H1 -.-> Z5([Return Completion Msg])
+                
+                %% Branch 6: Approve Daily Attendance (Multi-Payout)
+                C -- ApproveDailyAttendance --> I1[Parse JSON & Generate MultiPayoutRequestID]
+                I1 --> I2[Approve Attendance w/ Payout Frequency = MAP]
+                I2 --> I3[Pregenerate Wages specific to Multi-Payout Request ID]
+                I3 --> I4[Execute uspcreatepayoutfromadvice converting Advice to Payout]
+                I4 --> Z6([Return Payout Status])
+                
+                %% Styling
+                classDef default fill:#f9f9f9,stroke:#333,stroke-width:2px;
+                classDef action fill:#d4e6f1,stroke:#2980b9,stroke-width:2px;
+                classDef decision fill:#fcf3cf,stroke:#f1c40f,stroke-width:2px;
+                classDef endpoint fill:#fadbd8,stroke:#c0392b,stroke-width:2px;
+                
+                class A,Z1,Z2,Z3,Z4,Z5,Z6 endpoint;
+                class C,E2,G5,H2 decision;
+                class D1,D2,D3,E1,E4,E5,F1,F2,F3,F4,F5,G1,G2,G3,G4,G6,H1,H3,H4,I1,I2,I3,I4 action;
+        </div>
+    </div>
+    
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+</body>
+</html>

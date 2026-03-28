@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance Processing Flow via Shift Settings</title>
+    <script type="module">
+      import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+      mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: #f4f6f9; 
+            margin: 0; 
+            padding: 20px; 
+        }
+        .container { 
+            max-width: 1400px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 40px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05); 
+        }
+        h1 { 
+            color: #2c3e50; 
+            text-align: center; 
+            font-size: 2.2em;
+            margin-bottom: 5px;
+        }
+        .subtitle {
+            text-align: center; 
+            color: #7f8c8d; 
+            font-size: 1.1em;
+            margin-bottom: 40px;
+        }
+        .mermaid { 
+            display: flex; 
+            justify-content: center; 
+        }
+    </style>
+</head>
+<body>
+    <div style="padding: 15px 20px; background-color: #f8fafc; border-bottom: 1px solid #e2e8f0; margin-bottom: 20px;">
+        <a href="../dashboard.html" style="text-decoration: none; color: #475569; font-weight: 600; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: inline-flex; align-items: center; gap: 8px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+            Back to Dashboard
+        </a>
+    </div>
+    <div class="container">
+        <h1>Attendance Processing via Shift Settings</h1>
+        <div class="subtitle">A comprehensive flow chart demonstrating how the database engine processes employee attendance based on shift configurations, policies, and penalties.</div>
+        
+        <div class="mermaid">
+        flowchart TD
+            Start([Start Processing]) --> FetchShift[Identify & Fetch Employee Shift Details]
+            
+            FetchShift --> DefaultShift{Is Auto Shift Rotation Enabled<br>& Request falls outside Margin?}
+            DefaultShift -- Yes --> AutoAssign[Find & Assign Best Matching Shift]
+            DefaultShift -- No --> UseAssigned[Use Assigned Roster / Specific Shift]
+            AutoAssign --> FetchTimings
+            UseAssigned --> FetchTimings
+        
+            FetchTimings[Fetch Raw Check-In & Check-Out Times] --> ShiftTimings[Calculate Standard Shift Start & End Times]
+            ShiftTimings --> BreakPolicy[Apply Break Policy: Deduct Unpaid Breaks]
+            BreakPolicy --> RoundOff{Is Round-Off Enabled?}
+            
+            RoundOff -- Yes --> ApplyRoundOff[Round First Check-In forward<br>& Last Check-Out backward]
+            ApplyRoundOff --> CalcWorkedMins
+            RoundOff -- No --> CalcWorkedMins
+        
+            CalcWorkedMins[Calculate Total Minutes Worked] --> MinMaxCheck{Evaluate Min/Max<br>Working Hours Policy}
+            
+            MinMaxCheck -- Strict --> StrictCalc{Check Worked Minutes}
+            StrictCalc -- >= Full Day Mins --> MarkPP[Mark 'Present' PP]
+            StrictCalc -- >= Half Day & < Full Day --> MarkHD[Mark 'Half Day' HD]
+            StrictCalc -- < Half Day Mins --> MarkDE[Mark 'Deviation' DE / MP]
+            StrictCalc -- No Punches --> MarkMP[Mark 'Missed Punch' MP]
+        
+            MinMaxCheck -- Lenient --> LenientCalc{Check Worked Minutes}
+            LenientCalc -- > 0 --> MarkPPL[Mark 'Present' PP]
+            LenientCalc -- 0 --> MarkMPL[Mark 'Missed Punch' MP]
+        
+            MarkPP --> OTCheck
+            MarkHD --> OTCheck
+            MarkDE --> OTCheck
+            MarkMP --> OTCheck
+            MarkPPL --> OTCheck
+            MarkMPL --> OTCheck
+        
+            OTCheck{Is Overtime Enabled?}
+            OTCheck -- Yes --> CalcOT[Calculate OT: Worked Mins - Shift Mins]
+            CalcOT --> OTStartMode[Apply OT Start Mode<br>e.g., After Shift, After Manual Hrs]
+            OTStartMode --> MaxOT[Apply Daily OT Cap, Rounding,<br>& Multiplier Rules]
+            MaxOT --> GraceCheck
+            OTCheck -- No --> GraceCheck
+        
+            GraceCheck{Is Grace / Penalty<br>Policy Applied?}
+            GraceCheck -- Yes --> EvaluateLate[Evaluate Late Coming LC]
+            GraceCheck -- No --> OutputData
+        
+            EvaluateLate --> HasCheckInDev{Deviation > Grace Period?}
+            HasCheckInDev -- Yes --> VerifyOccurrence[Check Occurrences vs Max Uses<br> Weekly/Monthly/Quarterly]
+            VerifyOccurrence -- > Max Uses --> DeductLate[Apply Penality:<br>Leave / Fixed Amount / Per Min / Qtr]
+            VerifyOccurrence -- <= Max Uses --> RecordUse[Record Grace Usage]
+            HasCheckInDev -- No --> EvaluateEarly
+            RecordUse --> EvaluateEarly
+            DeductLate --> EvaluateEarly
+        
+            EvaluateEarly[Evaluate Early Going EG] --> HasCheckOutDev{Deviation > Grace Period?}
+            HasCheckOutDev -- Yes --> VerifyOccurrenceEnd[Check Occurrences vs Max Uses]
+            VerifyOccurrenceEnd -- > Max Uses --> DeductEarly[Apply Penality:<br>Leave / Fixed Amount / Per Min / Qtr]
+            VerifyOccurrenceEnd -- <= Max Uses --> RecordUseEnd[Record Grace Usage]
+            HasCheckOutDev -- No --> LeaveBalCheck
+            RecordUseEnd --> LeaveBalCheck
+            DeductEarly --> LeaveBalCheck
+        
+            LeaveBalCheck[Evaluate Final Leave Deductions<br>from Leave Balances CL, ML, EL] --> ApplyFlags[Apply Special Flags LC, EG, LCEG]
+            ApplyFlags --> OutputData
+            
+            OutputData([Return Final Results: Att_Type, Mins Worked,<br>OT, Leaves Deducted, Penalties])
+            
+            %% Styling
+            classDef startEnd fill:#2c3e50,stroke:#2c3e50,stroke-width:2px,color:#fff,font-weight:bold;
+            classDef decision fill:#f39c12,stroke:#e67e22,stroke-width:2px,color:#fff;
+            classDef process fill:#3498db,stroke:#2980b9,stroke-width:2px,color:#fff;
+            
+            class Start,OutputData startEnd;
+            class DefaultShift,RoundOff,MinMaxCheck,StrictCalc,LenientCalc,OTCheck,GraceCheck,HasCheckInDev,HasCheckOutDev,VerifyOccurrence,VerifyOccurrenceEnd decision;
+            class FetchShift,AutoAssign,UseAssigned,FetchTimings,ShiftTimings,BreakPolicy,ApplyRoundOff,CalcWorkedMins,MarkPP,MarkHD,MarkDE,MarkMP,MarkPPL,MarkMPL,CalcOT,OTStartMode,MaxOT,EvaluateLate,DeductLate,RecordUse,EvaluateEarly,DeductEarly,RecordUseEnd,LeaveBalCheck,ApplyFlags process;
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salary Calculation Procedure Flowchart</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f9f9f9; padding: 20px; line-height: 1.6; color: #333; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #2c3e50; }
+        h3 { color: #2980b9; margin-top: 30px; border-bottom: 2px solid #eee; padding-bottom: 5px; }
+        h4 { color: #34495e; margin-bottom: 10px; margin-top: 20px; }
+        .mermaid { display: flex; justify-content: center; margin-top: 20px; margin-bottom: 40px; }
+        .description-box { background: #f8f9fa; border-left: 4px solid #3498db; padding: 20px; margin-top: 20px; border-radius: 4px; box-shadow: inset 0 0 10px rgba(0,0,0,0.02); }
+        ul { margin-top: 0; }
+        li { margin-bottom: 8px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>uspccalcgrossfromctc_withoutconveyance <br><small>Execution Flow</small></h2>
+    
+    <!-- Mermaid Container -->
+    <div class="mermaid">
+        graph TD
+            A(["Start Procedure"]) --> B("Fetch Deductions & Meal Vouchers")
+            B --> C("Fetch Employer Compliance: PF Cap, EDLI")
+            C --> D("Fetch Employee Policies: NPS, Bonus, EWF")
+            
+            D --> E{"Min Wages Applicable?"}
+            E -- "Yes" --> F{"Is Basic <= 15000 OR <br> CTC < 17440?"}
+            F -- "Yes" --> G["Throw Error: Invalid MOP"]
+            F -- "No" --> H
+            E -- "No" --> H{"What is Salary Category?"}
+
+            H -- "Category 1 or 2 <br>(Fixed/Metro)" --> J["Calculate Base HRA & Allowances"]
+            J --> K["Calculate EPF/NPS on Basic"]
+            K --> L["Subtract Variables & Meal Vouchers from Target CTC"]
+            L --> M{"Is in ESI Range?"}
+            
+            M -- "Yes" --> N["Calculate Rest of Gross = <br>(Target CTC - PF - LWF - Bonus - Gratuity) / 1.0325"]
+            M -- "No" --> O["Calculate Rest of Gross = <br> Target CTC - PF - LWF - Bonus - Gratuity"]
+            
+            N --> P["Adjust HRA & Allowances to match target Gross"]
+            O --> P
+            
+            H -- "Other Categories <br>(Dynamic Build-up)" --> Q["Subtract Non-Wage Variables from Target CTC"]
+            Q --> R["Calculate Base EPF"]
+            R --> S{"Gross <= 21000 OR <br>In ESI Ambit?"}
+            S -- "Yes" --> T["Calculate ESI <br>(3.25% Er, 0.75% Ee)"]
+            S -- "No" --> U["ESI = 0"]
+            
+            T --> V["Sum Initial CTC"]
+            U --> V
+            
+            V --> W{"Calculated CTC vs Target CTC?"}
+            W -- "Calculated < Target" --> X["Increase Allowances <br>(divide by 1.0325 to compensate if ESI is active)"]
+            W -- "Calculated > Target" --> Y["Decrease Allowances <br>(divide by 1.0325 to compensate if ESI is active)"]
+            X --> Z["Finalize Gross"]
+            Y --> Z
+            
+            Z --> AA
+            P --> AA["Calculate Professional Tax Slab (Based on Gross + Variable)"]
+            
+            AA --> AB["Net Take Home = <br>Gross - (Emp PF + Emp ESI + PT + LWF + Bonus Deduction)"]
+            AB --> AC(["Return Output refcursor with 65+ calculated columns"])
+
+            style G fill:#ffcccc,stroke:#cc0000,stroke-width:2px,color:#900
+            style AC fill:#d4f1f4,stroke:#05445E,stroke-width:2px
+    </div>
+
+    <!-- The formatted Description appended logically below -->
+    <div class="description-box">
+        <p>Here is a step-by-step description of what is happening in the flowchart (and by extension, the stored procedure).</p>
+        <p>The flowchart is broken down into three main phases: Setup & Validation, Branching Logic, and Final Computations.</p>
+
+        <h3>Phase 1: Setup & Validation (The Top Section)</h3>
+        <ul>
+            <li><b>Fetch Deductions & Settings:</b> The procedure starts by pulling static configurations. It checks if the employee has specific add-ons like Meal Vouchers, Medical Insurance, National Pension System (NPS), or Government Bonus opted in. It also checks employer-level settings (like whether Provident Fund (PF) caps are strictly applied).</li>
+            <li><b>Minimum Wages Check:</b> The system verifies if strict Minimum Wage compliance is turned on (usually for companies with >20 employees where the user has opted out of PF).</li>
+            <li><b>Validation:</b> If this rule applies, the code enforces a hard block: the Basic salary cannot be ≤ 15,000, and the total CTC cannot be &lt; 17,440. If either fails, the procedure stops immediately and throws an error.</li>
+        </ul>
+
+        <h3>Phase 2: Salary Structure Branching (The Middle Section)</h3>
+        <p>The procedure diverges into two paths depending on the assigned Salary Category ID.</p>
+        
+        <h4>Path A: Category 1 or 2 (Fixed/Metro Calculations)</h4>
+        <p>This path is usually for management or fixed-structure employees.</p>
+        <ul>
+            <li><b>Base Calculation:</b> It calculates exact Base HRA (usually 40% or 50% depending on Metro/Non-Metro) and Base Allowances directly off the Basic salary.</li>
+            <li><b>PF/NPS Logic:</b> Computes the exact EPF and NPS based on the Basic.</li>
+            <li><b>ESI Back-Calculation:</b> If the employee falls into the ESI range (Employee State Insurance), the procedure must find the true Gross Salary. Because ESI charges the employer 3.25% of the Gross, it takes the Target CTC, subtracts fixed deductions (PF, Bonus, LWF), and divides the remaining amount by 1.0325 to find the exact, mathematically perfect Gross.</li>
+            <li><b>Allowance Fix:</b> Finally, it shrinks or inflates the HRA and Allowances to tightly match that exact Gross.</li>
+        </ul>
+
+        <h4>Path B: Other Categories (Dynamic Build-Up)</h4>
+        <p>This path dynamically juggles variables to ensure the final CTC exactly matches the offered target.</p>
+        <ul>
+            <li><b>Subtract Variables:</b> It temporarily removes performance variables and non-wage items from the target CTC.</li>
+            <li><b>ESI Check:</b> Checks if the currently projected Gross is ≤ ₹21,000 (the standard Indian threshold). If it is, ESI (3.25% for the Employer, 0.75% for the Employee) is activated.</li>
+            <li><b>The Balancing Point (“Calculated CTC vs Target CTC”):</b> It sums up everything calculated so far to create a "Calculated CTC".</li>
+            <li><b>If Calculated &lt; Target:</b> It increases the Allowances by the difference (adjusting by ÷ 1.0325 to compensate if ESI is silently adding tax overhead).</li>
+            <li><b>If Calculated &gt; Target:</b> It safely shrinks the Allowances using the exact same logic.</li>
+        </ul>
+        <p>It repeats this until the Gross is balanced perfectly with the target setup.</p>
+
+        <h3>Phase 3: Final Computations (The Bottom Section)</h3>
+        <p>Once the main mathematical juggling in Phase 2 is done, both paths converge back together to finalize the structure:</p>
+        <ul>
+            <li><b>Professional Tax (PT):</b> Since PT relies on the final complete Gross, it looks at the assigned state's tax slabs and deducts the appropriate Professional Tax amount based on the finalized Gross.</li>
+            <li><b>Net Take-Home Calculation:</b> The system takes the final calculated Gross salary and subtracts all the Employee liabilities: Employee PF, Employee ESI, Professional Tax, Labour Welfare Fund (LWF), and any advanced Bonus deductions.</li>
+            <li><b>Finish:</b> It compiles all 65+ generated values (Basic, Allowances, Net Take Home, Taxes, etc.) into a refcursor table row, and hands the complete structure back to the requesting system.</li>
+        </ul>
+    </div>
+</div>
+
+<!-- Import Mermaid.js script to render the graph automatically -->
+<script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, theme: 'default' });
+</script>
+
+</body>
+</html>

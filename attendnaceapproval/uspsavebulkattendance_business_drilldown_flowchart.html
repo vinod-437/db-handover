@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance Approval Drill-down</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background-color: #f4f7f6; color: #333; }
+        .container { max-width: 1200px; margin: auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #2c3e50; margin-bottom: 5px; }
+        p.subtitle { text-align: center; color: #7f8c8d; margin-bottom: 30px; }
+        .mermaid { display: flex; justify-content: center; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="margin-bottom: 20px;">
+            <a href="../dashboard.html" style="display: inline-block; padding: 10px 20px; background-color: #3498db; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">&larr; Back to Dashboard</a>
+        </div>
+        <h1>Attendance Approval Drill-down</h1>
+        <p class="subtitle">uspsavebulkattendance_business: Detailed View of ApproveBulkAttendance & ApproveBulkAttendanceFromExcel</p>
+        
+        <div class="mermaid">
+            graph TD
+                A([Start Action Routing]) --> B{Check Action}
+                
+                subgraph Excel[ApproveBulkAttendanceFromExcel]
+                    B -- ApproveBulkAttendanceFromExcel --> E1[Extract emp_codes, month, year from JSON]
+                    E1 --> E2((Loop over each<br>emp_code))
+                    E2 --> E3{Is Payment Advice<br>Locked?}
+                    E3 -- Yes --> E4[Log 'Not Approved' to tmpresponse_approve]
+                    E3 -- No --> E5[Determine Payroll Start/End Dates<br>using Custom Month Settings]
+                    E5 --> E6{Salary Advance<br>Attendance Exists?}
+                    E6 -- Yes --> E7[Log 'Advance Exists' to tmpresponse_approve]
+                    E6 -- No --> E8[Update tbl_monthly_attendance<br>approval_status = 'A']
+                    E8 --> E9{Apply Late/Early<br>Fine?}
+                    E9 -- Yes --> E10[Calculate Fines from tbl_monthly_attendance<br>Calculate Late/Early sum]
+                    E10 --> E11[Insert into tbl_employeeledger<br>with HeadIDs 171/172]
+                    E9 -- No --> E12
+                    E11 --> E12[Call uspupdatetaonadvice]
+                    E12 --> E13[Call uspwagesfromattendance_pregenerate]
+                    E13 --> E14[Log 'Approved' to tmpresponse_approve]
+                    E4 --> E15{More employees?}
+                    E7 --> E15
+                    E14 --> E15
+                    E15 -- Yes --> E2
+                    E15 -- No --> E16[Aggregate messages<br>from tmpresponse_approve]
+                end
+                E16 --> Z1([Return Summary Message])
+                
+                subgraph General[ApproveBulkAttendance / LockAttendance]
+                    B -- ApproveBulkAttendance --> G1[Parse JSON Date for Month/Year]
+                    G1 --> G2{Action is<br>ApproveBulkAttendance?}
+                    G2 -- Yes --> G3[Call usp_manage_att_status_before_approval]
+                    G3 -- Error --> Z2([Return MisPunchError])
+                    G3 -- Success --> G4
+                    G2 -- No --> G4{Is Payment Advice<br>Locked?}
+                    G4 -- Yes --> Z3([Return 'Already Locked'])
+                    G4 -- No --> G5[Determine Payroll Start/End Dates]
+                    G5 --> G6{Salary Advance<br>Attendance Exists?}
+                    G6 -- Yes --> Z4([Return 'Advance Exists'])
+                    G6 -- No --> G7[Update tbl_monthly_attendance<br>approval_status = 'A'<br>for given date boundaries]
+                    G7 --> G8[Insert 'Approved' dates to tmpresponse]
+                    G8 --> G9{Apply Late/Early<br>Fine?}
+                    G9 -- Yes --> G10[Calculate & Append into tbl_employeeledger<br>HeadIDs 171 and 172]
+                    G9 -- No --> G11[Call uspwagesfromattendance_pregenerate]
+                    G10 --> G11
+                    G11 --> G12{Is Action<br>LockAttendance?}
+                    G12 -- Yes --> G13[Call uspcreatewagesfromattendance]
+                    G12 -- No --> G14[Aggregate tmpresponse messages]
+                    G13 --> G14
+                end
+                G14 --> Z5([Return msg])
+                
+                classDef default fill:#f9f9f9,stroke:#333,stroke-width:2px;
+                classDef action fill:#d4e6f1,stroke:#2980b9,stroke-width:2px;
+                classDef decision fill:#fcf3cf,stroke:#f1c40f,stroke-width:2px;
+                classDef endpoint fill:#fadbd8,stroke:#c0392b,stroke-width:2px;
+                classDef loop fill:#e8daef,stroke:#8e44ad,stroke-width:2px;
+                
+                class A,Z1,Z2,Z3,Z4,Z5 endpoint;
+                class B,E3,E6,E9,E15,G2,G4,G6,G9,G12 decision;
+                class E1,E4,E5,E7,E8,E10,E11,E12,E13,E14,E16,G1,G3,G5,G7,G8,G10,G11,G13,G14 action;
+                class E2 loop;
+        </div>
+    </div>
+    
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+</body>
+</html>

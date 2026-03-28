@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>uspgetincrementdiff Flowchart</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f7f6;
+            color: #333;
+        }
+        .container {
+            max-width: 1000px;
+            margin: auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        p.subtitle {
+            text-align: center;
+            color: #7f8c8d;
+            margin-bottom: 30px;
+        }
+        .mermaid {
+            display: flex;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="margin-bottom: 20px;">
+            <a href="../dashboard.html" style="display: inline-block; padding: 10px 20px; background-color: #3498db; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">&larr; Back to Dashboard</a>
+        </div>
+        <h1>uspgetincrementdiff</h1>
+        <p class="subtitle">Salary Increment Arrear Generation Flow</p>
+        
+        <div class="mermaid">
+            graph TD
+                A([Start: uspgetincrementdiff]) --> B[Fetch Employee Appointment Details]
+                
+                B --> C{Is Action 'RetrieveVerified_Arear'?}
+                
+                C -- Yes --> D[Query existing processed arrears <br>from tbl_monthlysalary]
+                D --> E([Return Result Cursor])
+                
+                C -- No --> F[Query already paid EPF & Admin Charges<br> for the month]
+                F --> G{Is New Salary <br>Effective Mid-Month?}
+                
+                G -- Yes --> H[Delegate to uspgetmidmincrementdiff function]
+                H --> E
+                
+                G -- No --> I[Initialize Dynamic Query Construction]
+                
+                subgraph "Data Gathering & Calculation"
+                    I --> J[Fetch New Salary Structure: empsalaryregister]
+                    J --> K[Fetch Paid Working Days: cmsdownloadedwages]
+                    K --> L[Fetch Already Paid Amounts: tbl_monthlysalary]
+                    L --> M["Calculate Deltas (Arrears)"]
+                    M --> N["New Amount = (New Rate / MonthDays) * PaidDays"]
+                    N --> O["Arrear = New Amount - Already Paid Amount"]
+                    O --> P["Recalculate PF, ESI, and Gross/Net Totals"]
+                end
+                
+                P --> Q[(Execute Query into Temp Table:<br> tmp_sal_incr)]
+                
+                subgraph "Post-Processing"
+                    Q --> R[Adjustments for Special Categories<br> & Independent Contractors]
+                    R --> S[Recalculate Professional Tax Bracket <br>& Deduct Differences]
+                end
+                
+                S --> T{Check Final Action}
+                
+                T -- 'Retrieve_Previous_Salary' --> U[Select detailed data & status <br>from Temp Table]
+                U --> E
+                
+                T -- 'Save_Previous_Salary' --> V[(Insert rows from Temp Table <br>into tbl_monthlysalary)]
+                V --> W([Return Success Status])
+                
+                %% Styling
+                classDef default fill:#f9f9f9,stroke:#333,stroke-width:2px;
+                classDef action fill:#d4e6f1,stroke:#2980b9,stroke-width:2px;
+                classDef process fill:#d5f5e3,stroke:#27ae60,stroke-width:2px;
+                classDef decision fill:#fcf3cf,stroke:#f1c40f,stroke-width:2px;
+                classDef endpoint fill:#fadbd8,stroke:#c0392b,stroke-width:2px;
+                classDef db fill:#ebdef0,stroke:#8e44ad,stroke-width:2px;
+                
+                class A,E,W endpoint;
+                class C,G,T decision;
+                class D,F,J,K,L,U action;
+                class B,H,I,M,N,O,P,R,S process;
+                class Q,V db;
+        </div>
+    </div>
+    
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+</body>
+</html>

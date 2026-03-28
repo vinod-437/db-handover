@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shift Management Data Flow</title>
+    <script type="module">
+      import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+      mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: #f4f6f9; 
+            margin: 0; 
+            padding: 20px; 
+        }
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 40px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05); 
+        }
+        h1 { 
+            color: #2c3e50; 
+            text-align: center; 
+            font-size: 2.2em;
+            margin-bottom: 5px;
+        }
+        .subtitle {
+            text-align: center; 
+            color: #7f8c8d; 
+            font-size: 1.1em;
+            margin-bottom: 40px;
+        }
+        .mermaid { 
+            display: flex; 
+            justify-content: center; 
+        }
+    </style>
+</head>
+<body>
+    <div style="padding: 15px 20px; background-color: #f8fafc; border-bottom: 1px solid #e2e8f0; margin-bottom: 20px;">
+        <a href="../dashboard.html" style="text-decoration: none; color: #475569; font-weight: 600; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: inline-flex; align-items: center; gap: 8px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+            Back to Dashboard
+        </a>
+    </div>
+    <div class="container">
+        <h1>Shift Management Data & Procedure Flow</h1>
+        <div class="subtitle">A visual representation of how the frontend interacts with backend stored procedures and database tables to manage shifts.</div>
+        
+        <div class="mermaid">
+        flowchart TD
+            %% Frontend Layer
+            subgraph Frontend[Angular Frontend UI]
+                UI_Load[User Loads Shift UI]
+                UI_Save[User Saves Basic Shift Details]
+                UI_Policy[User Updates Policies]
+            end
+
+            %% API Layer
+            subgraph Gateway[API Gateway and Hub Controller]
+                API_GetMaster[API: getMasterShift]
+                API_SaveUpdate[API: saveUpdateShiftDetail]
+                API_UpdatePolicy[API: UpdateShiftPolicyDetails]
+            end
+
+            %% Database Procedures Layer
+            subgraph DB_Procedures[PostgreSQL Stored Procedures]
+                SP_Master[public.usp_master_data_node]
+                SP_ManageShift[public.usp_manage_shift_policy]
+                SP_NestedSavePolicy[public.usp_save_or_update_candidate_policy]
+                SP_UpdatePolicyBlob[public.usp_update_shift_policies]
+            end
+
+            %% Core Tables Layer
+            subgraph Core_Tables[Core Database Tables]
+                T_Master[Master Data Tables]
+                T_Shifts[(mst_tp_att_shifts)]
+                T_ShiftSlots[(tbl_shift_slots)]
+                T_CandidatesPol[(tbl_candidates_policies)]
+            end
+
+            %% View Layer
+            subgraph Views[Database Views]
+                V_ShiftEmp[public.vw_shifts_emp_wise]
+            end
+
+            %% --- Logical Flow and Relationships ---
+
+            UI_Load --> API_GetMaster
+            API_GetMaster --> SP_Master
+            SP_Master --> T_Master
+            T_Master -.- |Returns Dropdown Options| UI_Load
+
+            UI_Save --> API_SaveUpdate
+            API_SaveUpdate --> SP_ManageShift
+            SP_ManageShift --> |Insert or Update Base Details| T_Shifts
+            SP_ManageShift --> |Insert or Update Slot Configs| T_ShiftSlots
+            SP_ManageShift -.-> |Calls Nested Function| SP_NestedSavePolicy
+            SP_NestedSavePolicy --> |Updates Employee Configs| T_CandidatesPol
+            
+            SP_ManageShift -.-> |Reads Employee Mappings| V_ShiftEmp
+            V_ShiftEmp -.-> |Combines Shift Data and Employee Mapping| T_Shifts
+            
+            UI_Policy --> API_UpdatePolicy
+            API_UpdatePolicy --> SP_UpdatePolicyBlob
+            SP_UpdatePolicyBlob --> |Updates JSON blob fields| T_Shifts
+
+            %% Styling
+            classDef frontend fill:#3498db,stroke:#2980b9,stroke-width:2px,color:#fff;
+            classDef api fill:#e67e22,stroke:#d35400,stroke-width:2px,color:#fff;
+            classDef procedure fill:#9b59b6,stroke:#8e44ad,stroke-width:2px,color:#fff;
+            classDef dbTable fill:#2ecc71,stroke:#27ae60,stroke-width:2px,color:#fff,shape:cylinder;
+            classDef dbView fill:#1abc9c,stroke:#16a085,stroke-width:2px,color:#fff;
+
+            class UI_Load,UI_Save,UI_Policy frontend;
+            class API_GetMaster,API_SaveUpdate,API_UpdatePolicy api;
+            class SP_Master,SP_ManageShift,SP_NestedSavePolicy,SP_UpdatePolicyBlob procedure;
+            class T_Master,T_Shifts,T_ShiftSlots,T_CandidatesPol dbTable;
+            class V_ShiftEmp dbView;
+        </div>
+    </div>
+</body>
+</html>

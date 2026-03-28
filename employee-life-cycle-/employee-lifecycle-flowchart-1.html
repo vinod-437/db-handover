@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employee Lifecycle Flowchart</title>
+    <script type="module">
+      import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+      mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: #f4f6f9; 
+            margin: 0; 
+            padding: 20px; 
+            overflow-x: auto;
+        }
+        .container { 
+            width: fit-content;
+            min-width: 100%;
+            margin: 0 auto; 
+            background: white; 
+            padding: 40px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05); 
+        }
+        h1 { 
+            color: #2c3e50; 
+            text-align: center; 
+            font-size: 2.2em;
+            margin-bottom: 5px;
+        }
+        .subtitle {
+            text-align: center; 
+            color: #7f8c8d; 
+            font-size: 1.1em;
+            margin-bottom: 40px;
+        }
+        .mermaid { 
+            display: flex; 
+            justify-content: center; 
+        }
+    </style>
+</head>
+<body>
+    <div style="padding: 15px 20px; background-color: #f8fafc; border-bottom: 1px solid #e2e8f0; margin-bottom: 20px;">
+        <a href="../dashboard.html" style="text-decoration: none; color: #475569; font-weight: 600; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: inline-flex; align-items: center; gap: 8px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+            Back to Dashboard
+        </a>
+    </div>
+    <div class="container">
+        <h1>Complete Employee Lifecycle & Data Flow</h1>
+        <div class="subtitle">From Onboarding and Salary Setup to Shift Management, Attendance, and Final Payroll Processing.</div>
+        
+        <div class="mermaid">
+        flowchart TD
+            %% Primary Global Styles
+            classDef onboarding fill:#3498db,stroke:#2980b9,stroke-width:2px,color:#fff;
+            classDef salary fill:#e67e22,stroke:#d35400,stroke-width:2px,color:#fff;
+            classDef shift fill:#9b59b6,stroke:#8e44ad,stroke-width:2px,color:#fff;
+            classDef attendance fill:#2ecc71,stroke:#27ae60,stroke-width:2px,color:#fff;
+            classDef payroll fill:#e74c3c,stroke:#c0392b,stroke-width:2px,color:#fff;
+            classDef dbTable fill:#bdc3c7,stroke:#95a5a6,stroke-width:1px,color:#2c3e50,shape:cylinder;
+            
+            %% Phase 1: Onboarding
+            subgraph Phase1 [Phase 1: Employee Onboarding]
+                ONB_Start([Start Onboarding])
+                ONB_Basic[Collect Basic Details and KYC]
+                ONB_Bank[Verify Bank Details and UAN]
+                ONB_DB[(tbl_candidate / tbl_candidates_bank)]
+                
+                ONB_Start --> ONB_Basic --> ONB_Bank --> ONB_DB
+            end
+
+            %% Phase 2: Salary Setup
+            subgraph Phase2 [Phase 2: Salary Setup]
+                SAL_Start[Define Salary Structure / CTC]
+                SAL_Alloc[Allocate Basic, HRA, Allowances]
+                SAL_Ded[Configure Deductions PF, PT, ESIC, TDS]
+                SAL_DB[(empsalaryregister / mst_otherduction)]
+                
+                SAL_Start --> SAL_Alloc --> SAL_Ded --> SAL_DB
+            end
+
+            %% Phase 3: Shift Assignment
+            subgraph Phase3 [Phase 3: Shift Assignment]
+                SHF_Def[Define Master Shifts & Timings]
+                SHF_Pol[Set Grace, Overtime, & Penalty Policies]
+                SHF_Map[Map Shift / Roster to Employee]
+                SHF_DB[(mst_tp_att_shifts / tbl_employee_shift_roster)]
+                
+                SHF_Def --> SHF_Pol --> SHF_Map --> SHF_DB
+            end
+
+            %% Phase 4: Attendance Processing
+            subgraph Phase4 [Phase 4: Attendance Processing]
+                ATT_Punch[Daily Check-In / Check-Out Punches]
+                ATT_Core[Core Engine: calculate_employee_attandance_policy]
+                ATT_Rules[Apply Shift Margins, Rounding, Deduct Breaks]
+                ATT_Calc[Calculate Mins Worked, OT, Shortfalls]
+                ATT_Pen[Apply Late/Early Penalties & Deduct Leaves]
+                ATT_Approve[Manager Approves Pre-Attendance / Exceptions]
+                ATT_DB[(tbl_attendance / tbl_monthly_attendance)]
+                
+                ATT_Punch --> ATT_Core --> ATT_Rules --> ATT_Calc --> ATT_Pen --> ATT_Approve --> ATT_DB
+            end
+
+            %% Phase 5: Payroll Processing
+            subgraph Phase5 [Phase 5: Payroll Processing]
+                PAY_Start[Initiate Payroll Cycle]
+                PAY_Att[Fetch Approved Payable Days from Attendance]
+                PAY_Wages[Calculate Gross Wages: uspwagesfromattendance_pregenerate]
+                PAY_Adj[Apply Dynamic Additions / Arrears / Deductions]
+                PAY_Net[Calculate Net Pay & Taxes]
+                PAY_Advice[Generate Payment Advice & Payslips]
+                PAY_Lock[Lock Payroll & Disbursement via Bank Transfer]
+                PAY_DB[(tbl_monthlysalary / paymentadvice)]
+                
+                PAY_Start --> PAY_Att --> PAY_Wages --> PAY_Adj --> PAY_Net --> PAY_Advice --> PAY_Lock --> PAY_DB
+            end
+
+            %% Cross-Phase Data Flow Links
+            ONB_DB ==> |Employee Context| SAL_Start
+            ONB_DB ==> |Employee Context| SHF_Map
+            
+            SAL_DB -.-> |Wage Rates Used for OT/Penalty Calc| ATT_Core
+            SHF_DB ==> |Shift Rules Used by Engine| ATT_Core
+            
+            SAL_DB ==> |Base Salary Parameters| PAY_Wages
+            ATT_DB ==> |Approved Payable Days| PAY_Att
+
+            %% Apply Custom Styles
+            class ONB_Start,ONB_Basic,ONB_Bank onboarding;
+            class SAL_Start,SAL_Alloc,SAL_Ded salary;
+            class SHF_Def,SHF_Pol,SHF_Map shift;
+            class ATT_Punch,ATT_Core,ATT_Rules,ATT_Calc,ATT_Pen,ATT_Approve attendance;
+            class PAY_Start,PAY_Att,PAY_Wages,PAY_Adj,PAY_Net,PAY_Advice,PAY_Lock payroll;
+            class ONB_DB,SAL_DB,SHF_DB,ATT_DB,PAY_DB dbTable;
+        </div>
+    </div>
+</body>
+</html>

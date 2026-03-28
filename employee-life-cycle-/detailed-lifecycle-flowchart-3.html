@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detailed Employee Lifecycle Data Relationships</title>
+    <script type="module">
+      import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+      mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: #f4f6f9; 
+            margin: 0; 
+            padding: 20px; 
+            overflow-x: auto;
+        }
+        .container { 
+            width: fit-content;
+            min-width: 100%;
+            margin: 0 auto; 
+            background: white; 
+            padding: 40px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05); 
+        }
+        h1 { 
+            color: #2c3e50; 
+            text-align: center; 
+            font-size: 2.2em;
+            margin-bottom: 5px;
+        }
+        .subtitle {
+            text-align: center; 
+            color: #7f8c8d; 
+            font-size: 1.1em;
+            margin-bottom: 40px;
+        }
+        .mermaid { 
+            display: flex; 
+            justify-content: center; 
+        }
+    </style>
+</head>
+<body>
+    <div style="padding: 15px 20px; background-color: #f8fafc; border-bottom: 1px solid #e2e8f0; margin-bottom: 20px;">
+        <a href="../dashboard.html" style="text-decoration: none; color: #475569; font-weight: 600; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: inline-flex; align-items: center; gap: 8px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+            Back to Dashboard
+        </a>
+    </div>
+    <div class="container">
+        <h1>Detailed Employee Lifecycle: Tables & Relationships</h1>
+        <div class="subtitle">An entity relationship style flowchart detailing exactly how onboarding, salary, shifts, attendance, leaves, compliance, and payroll connect.</div>
+        
+        <div class="mermaid">
+        flowchart TB
+            %% Global Style Definitions
+            classDef tableNode fill:#f8f9fa,stroke:#bdc3c7,stroke-width:2px,color:#2c3e50,text-align:left;
+            classDef module fill:#ffffff,stroke:#34495e,stroke-width:2px,color:#fff,stroke-dasharray: 5 5;
+
+            %% PHASE 1: ONBOARDING
+            subgraph Phase1 [Phase 1: Employee Onboarding]
+                T_OpenAppt["`**openappointments**
+                --
+                id (PK)
+                emp_id / emp_code (Unique Identity)
+                customeraccountid
+                firstname, lastname
+                doj, uan
+                bankaccountno, ifsccode
+                bankname, bankbranch`"]
+            end
+
+            %% PHASE 2: SALARY SETUP
+            subgraph Phase2 [Phase 2: Salary Configuration]
+                T_Salary["`**empsalaryregister**
+                --
+                id (PK)
+                appointment_id (FK -> openappointments.id)
+                monthlyctc
+                basic, hra
+                is_ot_applicable`"]
+                
+                T_OtherDed["`**mst_otherduction**
+                --
+                id (PK)
+                deduction_name (PF, PT, ESIC)`"]
+                
+                T_CandDed["`**trn_candidate_otherduction**
+                --
+                id (PK)
+                appointment_id (FK -> openappointments.id)
+                deduction_id (FK -> mst_otherduction)
+                amount`"]
+                
+                SP_Salary["`**uspsavecustomsalarystructure()**
+                _Calculates & Saves CTC breakdowns_`"]
+                
+                T_OpenAppt -. "1:1" .-> T_Salary
+                T_OpenAppt -. "1:M" .-> T_CandDed
+                T_OtherDed -. "1:M" .-> T_CandDed
+            end
+
+            %% PHASE 3: SHIFT MANAGEMENT
+            subgraph Phase3 [Phase 3: Shift Management]
+                T_Shift["`**mst_tp_att_shifts**
+                --
+                shiftid (PK)
+                customeraccountid
+                shiftname
+                starttime, endtime
+                grace_period_policy (JSON)
+                penality_policy (JSON)`"]
+                
+                T_ShiftSlots["`**tbl_shift_slots**
+                --
+                slotid (PK)
+                shiftid (FK -> mst_tp_att_shifts)
+                start_time, end_time`"]
+                
+                T_Roster["`**tbl_employee_shift_roster**
+                --
+                id (PK)
+                emp_code (FK -> openappointments.emp_code)
+                shift_id (FK -> mst_tp_att_shifts)
+                start_date, end_date`"]
+                
+                T_ShiftMap["`**mst_tp_att_shiftmapping**
+                --
+                shiftmapping_id (PK)
+                customeraccountid
+                applicable_type (emp_code)
+                shift_name_id (FK)`"]
+                
+                VW_ShiftEmp["`**vw_shifts_emp_wise** (View)
+                _Links openappointments to shifts_`"]
+                
+                T_Shift -. "1:M" .-> T_ShiftSlots
+                T_OpenAppt -. "1:M" .-> T_Roster
+                T_Shift -. "1:M" .-> T_Roster
+                T_OpenAppt -. "1:M" .-> T_ShiftMap
+                T_Shift -. "1:M" .-> T_ShiftMap
+            end
+
+            %% PHASE 4: LEAVE MANAGEMENT
+            subgraph Phase4 [Phase 4: Leave Management]
+                T_LeaveType["`**mst_tp_att_typesofleave**
+                --
+                leave_id (PK)
+                customeraccountid
+                leave_type, description`"]
+                
+                T_LeaveBank["`**tbl_employee_leavebank**
+                --
+                rowid (PK)
+                emp_id (FK -> openappointments.emp_id)
+                account_id
+                intial_leave_bal_txt`"]
+                
+                T_LeaveApp["`**tbl_leave_application**
+                --
+                leave_applid (PK)
+                emp_id (FK -> openappointments.emp_id)
+                leave_bank_id (FK -> tbl_employee_leavebank)
+                leave_subject, leave_description`"]
+                
+                T_OpenAppt -. "1:1" .-> T_LeaveBank
+                T_LeaveType -. "1:M" .-> T_LeaveBank
+                T_LeaveBank -. "1:M" .-> T_LeaveApp
+            end
+
+            %% PHASE 5: ATTENDANCE
+            subgraph Phase5 [Phase 5: Attendance Processing]
+                T_Punches["`**openappointments** / **cmsdownloadedwages**
+                --
+                _Tracking base via emp_code & customeraccountid_`"]
+                
+                SP_Att["`**calculate_employee_attandance_policy()**
+                _Evaluates punches against shift rules_`"]
+                
+                T_Attendance["`**tbl_attendance**
+                --
+                attendanceid (PK)
+                emp_code (FK -> openappointments.emp_code)
+                customeraccountid
+                attendancedate
+                intime, outtime
+                workedmins
+                attendance_status (PP, HD, AB, MP)`"]
+                
+                T_MonthAtt["`**tbl_monthly_attendance**
+                --
+                id (PK)
+                emp_code (FK -> openappointments.emp_code)
+                customeraccountid
+                monthyear
+                payable_days
+                total_ot_mins
+                leaves_deducted`"]
+                
+                T_Punches --> SP_Att
+                VW_ShiftEmp --> SP_Att
+                T_Salary -. "Checks OT Config" .-> SP_Att
+                SP_Att -. "Generates Daily Record" .-> T_Attendance
+                SP_Att -. "Rolls up to" .-> T_MonthAtt
+                T_LeaveApp -. "Approves Leaves For" .-> T_Attendance
+            end
+
+            %% PHASE 6: PAYROLL & COMPLIANCE
+            subgraph Phase6 [Phase 6: Payroll & Statutory Compliance]
+                T_Comp["`**tbl_accountwisecompliances**
+                --
+                id (PK)
+                customeraccountid
+                _Config for PF, ESI, PT, LWF_`"]
+
+                SP_PreGen["`**uspwagesfromattendance_pregenerate()**
+                _Calculates daily wages using emp_code_`"]
+                
+                T_PayAdvice["`**paymentadvice**
+                --
+                paymentadviceid (PK)
+                emp_code / emp_id
+                monthyear
+                total_wages
+                netpay`"]
+                
+                T_MonthlySal["`**tbl_monthlysalary**
+                --
+                monthlysalaryid (PK)
+                emp_code / emp_id
+                monthyear
+                gross_salary
+                net_salary
+                pf_amount, esic_amount`"]
+                
+                T_MonthlyLiab["`**tbl_monthly_liability_salary**
+                --
+                id (PK)
+                emp_code (FK -> openappointments.emp_code)
+                monthyear
+                epf, employeeesirate
+                professionaltax, lwf_employee
+                taxable_income`"]
+                
+                T_MonthAtt --> SP_PreGen
+                T_Salary --> SP_PreGen
+                T_Comp -. "Rules applied to" .-> SP_PreGen
+                SP_PreGen -. "Generates Draft" .-> T_PayAdvice
+                T_PayAdvice -. "Locks Base Wages" .-> T_MonthlySal
+                T_PayAdvice -. "Locks Deducted Taxes" .-> T_MonthlyLiab
+                T_MonthlySal -. "Disbursed to Bank" .-> T_OpenAppt
+            end
+
+            %% Apply custom styles
+            class T_OpenAppt,T_Salary,T_OtherDed,T_CandDed,T_Shift,T_ShiftSlots,T_Roster,T_ShiftMap,T_LeaveType,T_LeaveBank,T_LeaveApp,T_Punches,T_Attendance,T_MonthAtt,T_Comp,T_PayAdvice,T_MonthlySal,T_MonthlyLiab tableNode;
+            
+        </div>
+    </div>
+</body>
+</html>
