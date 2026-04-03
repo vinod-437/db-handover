@@ -115,6 +115,7 @@
         .pillar.p2::before { background: linear-gradient(to bottom, #f59e0b, #ef4444); }
         .pillar.p3::before { background: linear-gradient(to bottom, #06b6d4, #3b82f6); }
         .pillar.p4::before { background: linear-gradient(to bottom, #10b981, #059669); }
+        .pillar.p5::before { background: linear-gradient(to bottom, #475569, #1e293b); }
 
         .pillar-header {
             display: flex;
@@ -296,6 +297,7 @@
                 erDiagram
                     employer ||--o{ openappointments : "houses (customeraccountid)"
                     openappointments ||--o{ empsalaryregister : "defines pay structure for"
+                    employer ||--o{ mst_otherduction : "defines custom deductions for"
                     openappointments ||--o{ tbl_monthly_attendance : "stamps bio-data for"
                     openappointments ||--o{ cmsdownloadedwages : "stages calculation logic for"
                     openappointments ||--o{ tbl_employeeledger : "generates ledger adjustments for"
@@ -433,6 +435,54 @@
                         </li>
                     </ul>
                 </div>
+
+                <!-- NEW: mst_otherduction -->
+                <div class="schema-card">
+                    <h3><i class="fa-solid fa-scissors"></i> mst_otherduction</h3>
+                    <div style="background: #f0fdf4; color: #166534; padding: 10px 15px; border-radius: 6px; font-size: 0.9rem; margin-bottom: 1rem; border: 1px solid #dcfce3;">
+                        <strong>Custom Setup Bounds:</strong> This sits alongside the Salary Register to map custom, non-statutory bounds (e.g., custom fines or contributions) uniquely applied per Employer.
+                    </div>
+                    <ul class="column-list">
+                        <li class="column-item" style="border-left-color: #7dd3fc;">
+                            <div class="col-header">
+                                <div class="col-name-wrapper">
+                                    <span class="col-name">customeraccountid</span>
+                                    <span class="key-tag fk-tag"><i class="fa-solid fa-link"></i> FK</span>
+                                </div>
+                                <span class="col-type">BIGINT</span>
+                            </div>
+                            <div class="col-desc">Binds this custom rule strictly to a specific Employer.</div>
+                            <div class="fk-pointer"><i class="fa-solid fa-arrow-turn-up fa-rotate-90"></i> References <strong>employer.account_id</strong></div>
+                        </li>
+                        <li class="column-item">
+                            <div class="col-header">
+                                <span class="col-name">masterledgername</span>
+                                <span class="col-type">VARCHAR</span>
+                            </div>
+                            <div class="col-desc">Dictates the financial bucket array this deduction routes into.</div>
+                        </li>
+                        <li class="column-item">
+                            <div class="col-header">
+                                <span class="col-name">calc_type</span>
+                                <span class="col-type">VARCHAR</span>
+                            </div>
+                            <div class="col-desc">Governs the mathematical operation.</div>
+                            <div class="col-values">
+                                <span class="val-tag">Percentage</span>
+                                <span class="val-tag">Flat</span>
+                            </div>
+                        </li>
+                        <li class="column-item" style="border-left-color: #fcd34d;">
+                            <div class="col-header">
+                                <div class="col-name-wrapper">
+                                    <span class="col-name">tpactivestatus / active</span>
+                                    <span class="key-tag soft-delete-tag"><i class="fa-solid fa-toggle-on"></i> STATE FLAG</span>
+                                </div>
+                                <span class="col-type">VARCHAR</span>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
             </div>
         </div>
 
@@ -556,8 +606,30 @@
                             </div>
                             <div class="fk-pointer"><i class="fa-solid fa-arrow-turn-up fa-rotate-90"></i> References <strong>openappointments.emp_code</strong></div>
                         </li>
+
+                        <!-- Addition: recordscreen -->
+                        <li class="column-item" style="border-left-color: #fcd34d; background: #fffbeb;">
+                            <div class="col-header">
+                                <span class="col-name" style="color: #92400e;">recordscreen</span>
+                                <span class="col-type">VARCHAR</span>
+                            </div>
+                            <div class="col-desc" style="color: #b45309;"><strong>The Classifier:</strong> The literal router that categorizes what the actual computational row encompasses (Arear diff vs physical check).</div>
+                            <div class="col-values">
+                                <span class="val-tag" style="background:#fde68a; border-color:#fcd34d; color:#78350f;">Current Wages</span>
+                                <span class="val-tag" style="background:#fde68a; border-color:#fcd34d; color:#78350f;">Previous Wages</span>
+                                <span class="val-tag" style="background:#fde68a; border-color:#fcd34d; color:#78350f;">Increment Arear</span>
+                            </div>
+                        </li>
+
+                        <!-- Addition: arearprocessmonth -->
+                        <li class="column-item" style="border-left-color: #fcd34d; background: #fffbeb;">
+                            <div class="col-header">
+                                <span class="col-name" style="color: #92400e;">arearprocessmonth</span>
+                                <span class="col-type">INT</span>
+                            </div>
+                            <div class="col-desc" style="color: #b45309;">The internal temporal boundary specifying exactly which calendar month (1-12) the arrear generation is isolated against.</div>
+                        </li>
                         
-                        <!-- Addition: DisbursedLedgerIds -->
                         <li class="column-item" style="border-left-color: #7dd3fc; background: #faf5ff;">
                             <div class="col-header">
                                 <div class="col-name-wrapper">
@@ -570,7 +642,6 @@
                             <div class="fk-pointer"><i class="fa-solid fa-arrow-turn-up fa-rotate-90"></i> References <strong>tbl_employeeledger.id</strong></div>
                         </li>
 
-                        <!-- Addition: Batch ID -->
                         <li class="column-item">
                             <div class="col-header">
                                 <span class="col-name">batchid</span>
@@ -601,7 +672,6 @@
                             </div>
                         </li>
                         
-                        <!-- Addition: is_rejected -->
                         <li class="column-item" style="border-left-color: #fca5a5;">
                             <div class="col-header">
                                 <div class="col-name-wrapper">
@@ -616,7 +686,6 @@
                     </ul>
                 </div>
 
-                <!-- NEW: Employee Ledger Bridge -->
                 <div class="schema-card">
                     <h3><i class="fa-solid fa-money-bill-transfer"></i> tbl_employeeledger</h3>
                     <div style="background: #fdf4ff; color: #86198f; padding: 10px 15px; border-radius: 6px; font-size: 0.9rem; margin-bottom: 1rem; border: 1px solid #fae8ff;">
@@ -755,6 +824,51 @@
                         </li>
                     </ul>
                 </div>
+            </div>
+        </div>
+
+        <!-- Pillar 5: Master Configurations -->
+        <div class="pillar p5">
+            <div class="pillar-header">
+                <div class="pillar-number">05</div>
+                <div>
+                    <h2 class="pillar-title">Global Master Configurations</h2>
+                    <p style="color: var(--text-muted); margin-top: 5px;">The strictly enforced foundation matrices that orchestrate routing and boundaries.</p>
+                </div>
+            </div>
+            
+            <div class="table-grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
+                
+                <div class="schema-card">
+                    <h3><i class="fa-solid fa-tag"></i> mst_appointment_status</h3>
+                    <p class="col-desc" style="margin-top:0;">Supplies the master enumerated identity constraints injected directly into <code>openappointments</code>.</p>
+                    <div class="col-values">
+                        <span class="val-tag">11 = Converted</span>
+                        <span class="val-tag">1 = Onboarding</span>
+                        <span class="val-tag">13 = Cancelled</span>
+                    </div>
+                </div>
+
+                <div class="schema-card">
+                    <h3><i class="fa-solid fa-shield-halved"></i> mst_minimumwagescategory</h3>
+                    <p class="col-desc" style="margin-top:0;">Stores the hard compliance boundaries enforced by law that the <code>empsalaryregister</code> evaluates against during custom setups.</p>
+                </div>
+
+                <div class="schema-card">
+                    <h3><i class="fa-solid fa-scale-unbalanced"></i> mst_taxslabs & rebates</h3>
+                    <p class="col-desc" style="margin-top:0;">The automated percentage and flat-rate engine strictly determining the mathematical overhead held on the employer's wallet side for taxes.</p>
+                </div>
+
+                <div class="schema-card">
+                    <h3><i class="fa-solid fa-address-book"></i> mst_customeraccount</h3>
+                    <p class="col-desc" style="margin-top:0;">The actual universal registry defining the primary corporate identity utilized heavily as the <code>customeraccountid</code> FK.</p>
+                </div>
+
+                <div class="schema-card">
+                    <h3><i class="fa-solid fa-money-bill-wave"></i> mst_paymenttype</h3>
+                    <p class="col-desc" style="margin-top:0;">Holds the final routing mechanisms to determine exactly which bank formatting (or cash distribution logic) takes precedence.</p>
+                </div>
+                
             </div>
         </div>
 
