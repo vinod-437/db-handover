@@ -6,6 +6,7 @@
     <title>Deep Dive Schema Dictionary</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
     <style>
         :root {
             --bg-color: #f1f5f9;
@@ -66,6 +67,7 @@
             color: var(--text-muted);
             max-width: 800px;
             margin: 0 auto;
+            margin-bottom: 2rem;
         }
 
         .back-btn {
@@ -183,20 +185,41 @@
             padding: 0.8rem;
             margin-bottom: 0.5rem;
             border-left: 3px solid #cbd5e1;
+            position: relative;
         }
+        
+        /* Relationship Keys */
+        .key-tag {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            font-weight: 800;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: 6px;
+        }
+        .pk-tag { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+        .fk-tag { background: #e0f2fe; color: #075985; border: 1px solid #7dd3fc; }
+        .soft-delete-tag { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
 
         .col-header {
             display: flex;
             justify-content: space-between;
-            align-items: baseline;
+            align-items: center;
             margin-bottom: 0.3rem;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+
+        .col-name-wrapper {
+            display: flex;
+            align-items: center;
         }
 
         .col-name {
             font-weight: 600;
             font-family: monospace;
             font-size: 1.05rem;
-            color: #b91c1c;
+            color: #1e293b;
         }
 
         .col-type {
@@ -214,6 +237,16 @@
             color: #475569;
             line-height: 1.4;
         }
+        
+        .fk-pointer {
+            font-size: 0.8rem;
+            color: #0284c7;
+            font-style: italic;
+            margin-top: 4px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
 
         /* Value Mappings */
         .col-values { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
@@ -229,6 +262,15 @@
         .val-tag-warn { background: #ffedd5; color: #c2410c; border: 1px solid #fed7aa; }
         .val-tag-success { background: #dcfce3; color: #166534; border: 1px solid #bbf7d0; }
 
+        .erd-box {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            border: 1px solid var(--border-color);
+            box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.03);
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -244,8 +286,23 @@
                 <i class="fa-solid fa-database"></i>
             </div>
             <h1>Empirical Database Schema Analysis</h1>
-            <p class="subtitle">A definitive architecture visualizer constructed directly from PostgreSQL empirical row-counts. This enhanced version strictly details the <strong>actual enumerated Master Values</strong> governing logical flow inside the database engine.</p>
+            <p class="subtitle">A definitive architecture visualizer pinpointing <strong>Logical Relationships (Primary/Foreign Keys)</strong>, <strong>Soft Deletion Matrix</strong>, and the <strong>Exact Enumerated Master Values</strong> parsed directly from live PostgreSQL database rules.</p>
         </header>
+
+        <div class="erd-box">
+            <h3 style="margin-top:0; color:var(--primary);"><i class="fa-solid fa-diagram-project"></i> Core Logical Entity Architecture</h3>
+            <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1rem;">TankhaPay uses <strong>Logical Constraints</strong> driven by application logic to prevent bulk bottlenecking, rather than strict DB-level cascading. The entire system is anchored to the Employee via <code>emp_code</code> and Employer via <code>customeraccountid</code>.</p>
+            <div class="mermaid">
+                erDiagram
+                    employer ||--o{ openappointments : "houses (customeraccountid)"
+                    openappointments ||--o{ empsalaryregister : "defines pay structure for"
+                    openappointments ||--o{ tbl_monthly_attendance : "stamps bio-data for"
+                    openappointments ||--o{ cmsdownloadedwages : "stages calculation logic for"
+                    openappointments ||--o{ tbl_monthlysalary : "generates final payroll array for"
+                    tbl_monthlysalary ||--o{ banktransfers : "outputs payout rows for"
+                    employer ||--o{ tbl_receivables : "holds wallets for"
+            </div>
+        </div>
 
         <!-- Pillar 1 -->
         <div class="pillar p1">
@@ -261,12 +318,26 @@
                 <div class="schema-card">
                     <h3><i class="fa-solid fa-id-card-clip"></i> openappointments</h3>
                     <ul class="column-list">
-                        <li class="column-item">
+                        <li class="column-item" style="border-left-color: #fca5a5;">
                             <div class="col-header">
-                                <span class="col-name">emp_code</span>
-                                <span class="col-type">VARCHAR</span>
+                                <div class="col-name-wrapper">
+                                    <span class="col-name">emp_code</span>
+                                    <span class="key-tag pk-tag"><i class="fa-solid fa-key"></i> PK</span>
+                                </div>
+                                <span class="col-type">VARCHAR / BIGINT</span>
                             </div>
-                            <div class="col-desc">Unique identifier across the system. (Top tier foreign key driver).</div>
+                            <div class="col-desc">The absolute central identifier. Nearly every downstream payroll calculation anchors back to this value.</div>
+                        </li>
+                        <li class="column-item" style="border-left-color: #7dd3fc;">
+                            <div class="col-header">
+                                <div class="col-name-wrapper">
+                                    <span class="col-name">customeraccountid</span>
+                                    <span class="key-tag fk-tag"><i class="fa-solid fa-link"></i> FK</span>
+                                </div>
+                                <span class="col-type">BIGINT</span>
+                            </div>
+                            <div class="col-desc">Binds the employee to a parent employer wallet.</div>
+                            <div class="fk-pointer"><i class="fa-solid fa-arrow-turn-up fa-rotate-90"></i> References <strong>employer.account_id</strong></div>
                         </li>
                         <li class="column-item">
                             <div class="col-header">
@@ -281,18 +352,31 @@
                                 <span class="val-tag">15 = Suspended</span>
                             </div>
                         </li>
+                        <li class="column-item" style="border-left-color: #fcd34d;">
+                            <div class="col-header">
+                                <div class="col-name-wrapper">
+                                    <span class="col-name">isactive</span>
+                                    <span class="key-tag soft-delete-tag"><i class="fa-solid fa-toggle-on"></i> STATE FLAG</span>
+                                </div>
+                                <span class="col-type">BIT</span>
+                            </div>
+                            <div class="col-desc">Logical deletion constraint preventing execution. 1 = Active, 0 = Inactive.</div>
+                        </li>
                     </ul>
                 </div>
 
                 <div class="schema-card">
                     <h3><i class="fa-solid fa-building"></i> employer</h3>
                     <ul class="column-list">
-                        <li class="column-item">
+                        <li class="column-item" style="border-left-color: #fca5a5;">
                             <div class="col-header">
-                                <span class="col-name">account_id</span>
+                                <div class="col-name-wrapper">
+                                    <span class="col-name">account_id / employerid</span>
+                                    <span class="key-tag pk-tag"><i class="fa-solid fa-key"></i> PK</span>
+                                </div>
                                 <span class="col-type">BIGINT</span>
                             </div>
-                            <div class="col-desc">Links physical profiles to internal virtual wallets in tbl_account.</div>
+                            <div class="col-desc">The ultimate parent entity bounding liabilities and cash logic.</div>
                         </li>
                         <li class="column-item">
                             <div class="col-header">
@@ -301,18 +385,49 @@
                             </div>
                             <div class="col-desc">Global remitter configuration for banking logic routing.</div>
                         </li>
+                        <li class="column-item" style="border-left-color: #fcd34d;">
+                            <div class="col-header">
+                                <div class="col-name-wrapper">
+                                    <span class="col-name">active</span>
+                                    <span class="key-tag soft-delete-tag"><i class="fa-solid fa-toggle-on"></i> STATE FLAG</span>
+                                </div>
+                                <span class="col-type">BIT</span>
+                            </div>
+                            <div class="col-desc">Halts all calculations universally for this corporate entity if set to 0.</div>
+                        </li>
                     </ul>
                 </div>
 
                 <div class="schema-card">
                     <h3><i class="fa-solid fa-file-invoice"></i> empsalaryregister</h3>
                     <ul class="column-list">
+                        <li class="column-item" style="border-left-color: #7dd3fc;">
+                            <div class="col-header">
+                                <div class="col-name-wrapper">
+                                    <span class="col-name">appointment_id</span>
+                                    <span class="key-tag fk-tag"><i class="fa-solid fa-link"></i> FK</span>
+                                </div>
+                                <span class="col-type">INT</span>
+                            </div>
+                            <div class="col-desc">Binds the salary definition.</div>
+                            <div class="fk-pointer"><i class="fa-solid fa-arrow-turn-up fa-rotate-90"></i> References <strong>openappointments.emp_id</strong></div>
+                        </li>
                         <li class="column-item">
                             <div class="col-header">
                                 <span class="col-name">gross / ctc / basic</span>
                                 <span class="col-type">NUMERIC</span>
                             </div>
                             <div class="col-desc">Contractual numeric margins holding the final max bounds scaled by Loss-of-Pay multipliers.</div>
+                        </li>
+                        <li class="column-item" style="border-left-color: #fcd34d;">
+                            <div class="col-header">
+                                <div class="col-name-wrapper">
+                                    <span class="col-name">isactive</span>
+                                    <span class="key-tag soft-delete-tag"><i class="fa-solid fa-toggle-on"></i> STATE FLAG</span>
+                                </div>
+                                <span class="col-type">BIT</span>
+                            </div>
+                            <div class="col-desc">Used alongside 'FINYEAR' definitions to keep historical structures disabled.</div>
                         </li>
                     </ul>
                 </div>
@@ -333,6 +448,16 @@
                 <div class="schema-card">
                     <h3><i class="fa-regular fa-calendar-check"></i> tbl_monthly_attendance</h3>
                     <ul class="column-list">
+                        <li class="column-item" style="border-left-color: #7dd3fc;">
+                            <div class="col-header">
+                                <div class="col-name-wrapper">
+                                    <span class="col-name">emp_code</span>
+                                    <span class="key-tag fk-tag"><i class="fa-solid fa-link"></i> FK</span>
+                                </div>
+                                <span class="col-type">BIGINT</span>
+                            </div>
+                            <div class="fk-pointer"><i class="fa-solid fa-arrow-turn-up fa-rotate-90"></i> References <strong>openappointments.emp_code</strong></div>
+                        </li>
                         <li class="column-item">
                             <div class="col-header">
                                 <span class="col-name">approval_status</span>
@@ -344,12 +469,31 @@
                                 <span class="val-tag val-tag-warn">P = Pending</span>
                             </div>
                         </li>
+                        <li class="column-item" style="border-left-color: #fcd34d;">
+                            <div class="col-header">
+                                <div class="col-name-wrapper">
+                                    <span class="col-name">isactive</span>
+                                    <span class="key-tag soft-delete-tag"><i class="fa-solid fa-toggle-on"></i> STATE FLAG</span>
+                                </div>
+                                <span class="col-type">BIT</span>
+                            </div>
+                        </li>
                     </ul>
                 </div>
 
                 <div class="schema-card">
                     <h3><i class="fa-solid fa-person-digging"></i> cmsdownloadedwages</h3>
                     <ul class="column-list">
+                        <li class="column-item" style="border-left-color: #7dd3fc;">
+                            <div class="col-header">
+                                <div class="col-name-wrapper">
+                                    <span class="col-name">empcode</span>
+                                    <span class="key-tag fk-tag"><i class="fa-solid fa-link"></i> FK</span>
+                                </div>
+                                <span class="col-type">VARCHAR</span>
+                            </div>
+                            <div class="fk-pointer"><i class="fa-solid fa-arrow-turn-up fa-rotate-90"></i> References <strong>openappointments.emp_code</strong></div>
+                        </li>
                         <li class="column-item">
                             <div class="col-header">
                                 <span class="col-name">attendancemode</span>
@@ -362,12 +506,14 @@
                                 <span class="val-tag">Manual (Admin Override)</span>
                             </div>
                         </li>
-                        <li class="column-item">
+                        <li class="column-item" style="border-left-color: #fcd34d;">
                             <div class="col-header">
-                                <span class="col-name">issalaryunlocked</span>
+                                <div class="col-name-wrapper">
+                                    <span class="col-name">isactive</span>
+                                    <span class="key-tag soft-delete-tag"><i class="fa-solid fa-toggle-on"></i> STATE FLAG</span>
+                                </div>
                                 <span class="col-type">BIT</span>
                             </div>
-                            <div class="col-desc">Validation barrier. NULL implies it has been locked out from any processing pipeline execution.</div>
                         </li>
                     </ul>
                 </div>
@@ -391,6 +537,16 @@
                         <strong>Architectural Fact:</strong> The final payroll block natively combines tracking for physical payouts alongside internal accounting bounds! By reading <code>issalaryorliability</code>, the system parses the ledger row identity.
                     </div>
                     <ul class="column-list" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <li class="column-item" style="border-left-color: #7dd3fc;">
+                            <div class="col-header">
+                                <div class="col-name-wrapper">
+                                    <span class="col-name">emp_code</span>
+                                    <span class="key-tag fk-tag"><i class="fa-solid fa-link"></i> FK</span>
+                                </div>
+                                <span class="col-type">BIGINT</span>
+                            </div>
+                            <div class="fk-pointer"><i class="fa-solid fa-arrow-turn-up fa-rotate-90"></i> References <strong>openappointments.emp_code</strong></div>
+                        </li>
                         <li class="column-item">
                             <div class="col-header">
                                 <span class="col-name">issalaryorliability</span>
@@ -414,30 +570,6 @@
                                 <span class="val-tag">NULL = Pending Disbursement</span>
                             </div>
                         </li>
-                        <li class="column-item">
-                            <div class="col-header">
-                                <span class="col-name">batchid</span>
-                                <span class="col-type">VARCHAR</span>
-                            </div>
-                            <div class="col-desc">Group execution tag allowing mass commits or rollbacks on bulk reports.</div>
-                        </li>
-                    </ul>
-                </div>
-
-                <div class="schema-card">
-                    <h3><i class="fa-solid fa-circle-pause"></i> managetemppausedsalary</h3>
-                    <ul class="column-list">
-                        <li class="column-item">
-                            <div class="col-header">
-                                <span class="col-name">pausedstatus</span>
-                                <span class="col-type">VARCHAR</span>
-                            </div>
-                            <div class="col-desc">Administrative override actively stopping the employee from passing to the banking engine.</div>
-                            <div class="col-values">
-                                <span class="val-tag val-tag-warn">Enable = Actively Blocked</span>
-                                <span class="val-tag val-tag-success">Disable = Resumed</span>
-                            </div>
-                        </li>
                     </ul>
                 </div>
             </div>
@@ -457,6 +589,16 @@
                 <div class="schema-card">
                     <h3><i class="fa-solid fa-money-check-dollar"></i> banktransfers</h3>
                     <ul class="column-list">
+                        <li class="column-item" style="border-left-color: #7dd3fc;">
+                            <div class="col-header">
+                                <div class="col-name-wrapper">
+                                    <span class="col-name">emp_code</span>
+                                    <span class="key-tag fk-tag"><i class="fa-solid fa-link"></i> FK</span>
+                                </div>
+                                <span class="col-type">BIGINT</span>
+                            </div>
+                            <div class="fk-pointer"><i class="fa-solid fa-arrow-turn-up fa-rotate-90"></i> References <strong>openappointments.emp_code</strong></div>
+                        </li>
                         <li class="column-item">
                             <div class="col-header">
                                 <span class="col-name">bankbatchcode</span>
@@ -464,19 +606,22 @@
                             </div>
                             <div class="col-desc">Constructs the actual HDFC/HSBC CSV text mapping tags.</div>
                         </li>
-                        <li class="column-item">
-                            <div class="col-header">
-                                <span class="col-name">salary</span>
-                                <span class="col-type">NUMERIC</span>
-                            </div>
-                            <div class="col-desc">Should perfectly echo the <code>netpay</code> calculation stored for the "S" designated rows.</div>
-                        </li>
                     </ul>
                 </div>
 
                 <div class="schema-card">
                     <h3><i class="fa-solid fa-building-shield"></i> tbl_employer_challan_deposit</h3>
                     <ul class="column-list">
+                        <li class="column-item" style="border-left-color: #7dd3fc;">
+                            <div class="col-header">
+                                <div class="col-name-wrapper">
+                                    <span class="col-name">customeraccountid</span>
+                                    <span class="key-tag fk-tag"><i class="fa-solid fa-link"></i> FK</span>
+                                </div>
+                                <span class="col-type">BIGINT</span>
+                            </div>
+                            <div class="fk-pointer"><i class="fa-solid fa-arrow-turn-up fa-rotate-90"></i> References <strong>employer.account_id</strong></div>
+                        </li>
                         <li class="column-item">
                             <div class="col-header">
                                 <span class="col-name">challantype</span>
@@ -488,11 +633,24 @@
                                 <span class="val-tag">ESIC</span>
                             </div>
                         </li>
+                        <li class="column-item" style="border-left-color: #fcd34d;">
+                            <div class="col-header">
+                                <div class="col-name-wrapper">
+                                    <span class="col-name">isactive</span>
+                                    <span class="key-tag soft-delete-tag"><i class="fa-solid fa-toggle-on"></i> STATE FLAG</span>
+                                </div>
+                                <span class="col-type">VARCHAR</span>
+                            </div>
+                        </li>
                     </ul>
                 </div>
             </div>
         </div>
 
     </div>
+    
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
+    </script>
 </body>
 </html>
