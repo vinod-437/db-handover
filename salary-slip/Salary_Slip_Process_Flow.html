@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salary Slip Generation Process Flow</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script type="module">
+      import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+      mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --accent: #2563eb;
+            --accent-hover: #1d4ed8;
+            --border: #e2e8f0;
+            --highlight: #059669;
+            --warn: #d97706;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            background: -webkit-linear-gradient(45deg, var(--accent), var(--highlight));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        h2 {
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 0.5rem;
+            margin-top: 2rem;
+            color: var(--accent);
+        }
+
+        h3 {
+            color: var(--highlight);
+            margin-bottom: 1rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+            transition: transform 0.2s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+        }
+
+        .mermaid-container {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: center;
+            overflow-x: auto;
+        }
+
+        ul {
+            list-style-type: none;
+            padding-left: 0.5rem;
+        }
+
+        li {
+            margin-bottom: 0.8rem;
+            position: relative;
+            padding-left: 1.5rem;
+            color: var(--text-secondary);
+        }
+
+        li::before {
+            content: '▹';
+            position: absolute;
+            left: 0;
+            color: var(--accent);
+            font-weight: bold;
+        }
+        
+        strong {
+            color: var(--text-primary);
+        }
+
+        .badge {
+            background: var(--accent);
+            color: white;
+            font-size: 0.75rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 9999px;
+            font-weight: 600;
+            margin-right: 0.5rem;
+        }
+        .badge.warn {
+            background: var(--warn);
+        }
+
+        .flex-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        @media (max-width: 768px) {
+            .flex-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Salary Slip Process Flow</h1>
+            <p style="color: var(--text-secondary); font-size: 1.1rem;">Technical analysis of Database Functions: <code>uspgeneratesalaryslip</code> & <code>uspgetreportfields</code></p>
+        </header>
+
+        <section>
+            <h2>Process Flow Architecture</h2>
+            <p>The following diagram maps out how an employee's salary slip is generated from input arguments down to the multiple refcursors returned to the application backend.</p>
+            <div class="mermaid-container">
+                <div class="mermaid">
+                    graph TD
+                        A[Start: uspgeneratesalaryslip] --> B{Is Special Employee?}
+                        B -- Yes --> C[Return Empty Slip]
+                        B -- No --> D[Fetch Employer Details]
+                        D --> E{Is Salary Slip Disabled?}
+                        E -- Yes --> C
+                        E -- No --> F[Gather Paid Days & LOP]
+                        F --> G[Call uspmonthwisebilling]
+                        subgraph uspmonthwisebilling
+                            G1[Start] --> G2{Action type}
+                            G2 -- GetMonthBilling --> G3[Aggregate Salary & Allowances]
+                            G3 --> G4[(Build tmpbilling)]
+                            G4 --> G5[Compute Statutory VPF/ESI/TDS]
+                            G5 --> G6[Return Cursor]
+                            G2 -- GetArrearBilling --> G7[Call uspmonthwiseiablityreport]
+                            G7 --> G6
+                        end
+                        G -.-> G1
+                        G6 -.-> H[(Populate tmpsalslip text table)]
+                        H --> I[(Aggregate & Summarize into tmp_monsalslip)]
+                        I --> J{CTC/Client Restrictions?}
+                        J -- Yes --> C
+                        J -- No --> K[Cursor 1: Employee/Employer Info]
+                        K --> L[Cursor 2: Deductions from Employee Ledger]
+                        L --> M[Cursor 3: Earnings/Variables from Employee Ledger]
+                        M --> N[Cursor 4: PAN Card Detail]
+                        N --> O[Call uspgetreportfields: Earnings Heads]
+                        O --> P[Call uspgetreportfields: Deductions Heads]
+                        P --> Q[Cursor 7, 8: Blank & Meal Vouchers]
+                        Q --> R[Return All Refcursors]
+
+                        subgraph uspgetreportfields
+                            O1[Init] --> O2[Call getmastersalarystructure]
+                            O2 --> O3[(Populate tmp_reportfields)]
+                            O3 --> O4[Parse Dynamic Formats 'Arrears / Rate']
+                            O4 --> O5{Is Report 'Salary Slip'?}
+                            O5 -- Yes --> O6[Delete 'Rate' Columns & Clean Names]
+                            O5 -- No --> O7[Format Data]
+                            O6 --> O7
+                            O7 --> O8[Return Ordered Refcursor]
+                        end
+
+                        O -.-> O1
+                        P -.-> O1
+                </div>
+            </div>
+        </section>
+
+        <div class="flex-grid">
+            <section class="card">
+                <h3><span class="badge">Main</span> uspgeneratesalaryslip Detailed Logics</h3>
+                <ul>
+                    <li><strong>Inputs:</strong> Takes <code>p_emp_code</code>, <code>p_month</code>, <code>p_year</code>, and origin flags.</li>
+                    <li><strong>Initialization:</strong> Gathers foundational data like limits (MTD), Payout Mode, Principal Employer name, and the customer IDs.</li>
+                    <li><strong>Edge Cases validation:</strong>
+                        Forces exceptions for "Special categories", "Hidden Salary slips" enabled by app settings, and threshold limits based on clients (e.g. CTC &lt;= 22000 for Jivo or CTC &lt;= 8000 for Kateba).
+                    </li>
+                    <li><strong>Fetching Financials:</strong> It aggregates month-wise data by wrapping <code>uspmonthwisebilling</code>. <code>tmp_monsalslip</code> gathers totals, leaves, PF, ESI, and deductions.</li>
+                    <li><strong>Complex Multi-cursor returns:</strong> Uses PostgreSQL's <code>SETOF refcursor</code> feature returning around 8 distinct cursors respectively for: Main Slip Details, Deductions breakdown, Earnings Breakdown, PAN, Header Templates, and Defaults.</li>
+                </ul>
+            </section>
+
+            <section class="card">
+                <h3><span class="badge warn">Sub</span> uspgetreportfields Detailed Logics</h3>
+                <ul>
+                    <li><strong>Dynamic Generation:</strong> Handles the dynamic loading of labels to ensure the UI headers reflect the correct database columns.</li>
+                    <li><strong>Integration:</strong> Depends on <code>getmastersalarystructure</code> to fetch base earning/deduction rules attached to the customer account id.</li>
+                    <li><strong>Rate Cleansing & Overrides:</strong> 
+                        Loops through generated components, dynamically appending textual flags like <i>'Arrear '</i> and <i>'Rate '</i>.
+                        If the report is expressly a <code>'Salary Slip'</code>, it purges rate-based columns.
+                    </li>
+                    <li><strong>Client Overrides:</strong> Hardcoded custom formatting rules. For instance, customer <code>7653</code> specifically updates "ESIC" labels to "ESI Employee Contribution @.75%".</li>
+                    <li><strong>Output format:</strong> Returns sorted refcursor <code>reportcolumnname, reportcomponentname, displayorder</code> to be utilized by the parent.</li>
+                </ul>
+            </section>
+
+            <section class="card">
+                <h3><span class="badge warn">Sub</span> uspmonthwisebilling Detailed Logics</h3>
+                <ul>
+                    <li><strong>Action Routing:</strong> Depending on <code>p_action</code>, it either generates month billing (<code>GetMonthBilling</code>) or arrear billing by routing to <code>uspmonthwiseiablityreport</code>.</li>
+                    <li><strong>Complex Aggregation:</strong> Harvests base metrics from <code>tbl_monthlysalary</code> and cross-references missing or updated deductions such as <code>Conveyance</code>, <code>Tea Allowance</code>, and <code>Advances</code>.</li>
+                    <li><strong>Arrears Processing:</strong> Consolidates data from previous/current wages explicitly targeted for increments and arrears.</li>
+                    <li><strong>Outputs:</strong> Uses a monolithic temporary table <code>tmpbilling</code> to structure over 100 column properties (Earnings, Deductions, Transfers, Ledgers) dynamically feeding into the main salary generation cursor.</li>
+                </ul>
+            </section>
+        </div>
+    </div>
+</body>
+</html>

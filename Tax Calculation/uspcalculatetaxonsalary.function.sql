@@ -916,16 +916,20 @@ Raise Notice 'v_sum_list=%',v_sql;
 
     -- 3. Execute the query
     -- Using RETURN QUERY if this is inside a function returning SETOF ...
-    EXECUTE v_sql 
-    USING p_emp_code,          -- $1
-          v_startdate,        -- $2
-          v_enddate,          -- $3
-          v_advancestartdate, -- $4
-          v_advanceenddate,   -- $5
-          v_year1,            -- $6
-          v_finyearenddate,   -- $7
-          v_year2,            -- $8
-          v_leftflag;           -- $9
+    if v_sql is not null then
+        EXECUTE v_sql 
+        USING p_emp_code,          -- $1
+              v_startdate,        -- $2
+              v_enddate,          -- $3
+              v_advancestartdate, -- $4
+              v_advanceenddate,   -- $5
+              v_year1,            -- $6
+              v_finyearenddate,   -- $7
+              v_year2,            -- $8
+              v_leftflag;           -- $9
+    else
+        create temporary table tmp2 on commit drop as select ''::text as componentname, ''::text as newcomponentname, 0::numeric as total_amount where false;
+    end if;
  /********change 1.13 starts***************/
 select
 sum(least(coalesce(total_amount,0),coalesce(investment_amount,0),coalesce(max_limit,investment_amount,0)))

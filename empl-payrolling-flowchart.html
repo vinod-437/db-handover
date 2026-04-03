@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Empl-Payrolling Logic Flowchart</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f6f9;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+    </style>
+    <!-- Use latest stable Mermaid module -->
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Empl-Payrolling Flowchart</h1>
+        <p>A visual breakdown of the page logic</p>
+    </div>
+
+    <div class="container">
+        <!-- Must use <pre class="mermaid"> for Mermaid 11+ -->
+        <pre class="mermaid">
+        graph TD
+            Start[Initialization] --> Extract[Extract URL Params]
+            Extract --> FetchMaster[Fetch Master Data]
+            FetchMaster --> ActionBranch{Action Param?}
+            
+            ActionBranch -->|salary| Salary[Load customSalaryform]
+            ActionBranch -->|EPF or ESI| Compliance[Load statutoryComplianceForm]
+            ActionBranch -->|exit| ExitModal[Open Exit Form]
+            ActionBranch -->|experience| ExpModal[Open Experience Form]
+            ActionBranch -->|consultant| ConModal[Open Consultant Form]
+
+            Salary --> CalcSal[Calculate Math Split]
+            CalcSal --> GetGrossAPI[API call: getuspccalcgrossfromctc]
+            GetGrossAPI --> DisplaySal[Display Result In Table]
+            DisplaySal --> SaveSal[User clicks Save]
+            SaveSal --> SaveSalAPI[API call: saveCustomSalaryStructure]
+
+            Compliance --> SaveStat[User Clicks Save]
+            SaveStat --> SaveStatAPI[API call: save statutory compliance]
+
+            ExitModal --> SaveExit[API call: saveExitEmployee]
+            
+            ExpModal --> GenExp[Generate Letter]
+            ConModal --> SaveCon[Save Consultant API]
+        </pre>
+    </div>
+</body>
+</html>
