@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Core Payroll Tables Directory</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-color: #f8f9fa;
+            --text-main: #333333;
+            --primary: #0f172a;
+            --accent: #3b82f6;
+            --card-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            --border-color: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 2rem;
+            line-height: 1.6;
+            padding-bottom: 5rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            margin-bottom: 3rem;
+        }
+
+        h1 {
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+            font-size: 2.2rem;
+        }
+
+        .subtitle {
+            color: #64748b;
+            font-size: 1.1rem;
+        }
+
+        .table-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem 2rem;
+            box-shadow: var(--card-shadow);
+            margin-bottom: 2.5rem;
+            border-top: 4px solid var(--accent);
+            transition: transform 0.2s;
+        }
+        
+        .table-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 15px rgba(0,0,0,0.08);
+        }
+
+        .table-card h2 {
+            margin-top: 0;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.4rem;
+        }
+
+        .table-card h2 i {
+            color: var(--accent);
+        }
+
+        .desc-box {
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 1rem 1.5rem;
+            color: #475569;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border-color);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.95rem;
+        }
+
+        th, td {
+            padding: 14px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+            vertical-align: top;
+        }
+
+        th {
+            background-color: #f1f5f9;
+            color: #475569;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 0.5px;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        .col-name {
+            font-family: monospace;
+            font-weight: 600;
+            color: #be185d;
+            font-size: 0.95rem;
+        }
+
+        .col-type {
+            color: #0f766e;
+            font-size: 0.85rem;
+        }
+
+        .tag {
+            display: inline-block;
+            background: #e0f2fe;
+            color: #0369a1;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 5px;
+            vertical-align: middle;
+        }
+
+        .tag-pk { background: #fef08a; color: #854d0e; }
+        .tag-fk { background: #dcfce7; color: #166534; }
+
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            background: white;
+            padding: 0.6rem 1.2rem;
+            border-radius: 8px;
+            text-decoration: none;
+            color: var(--primary);
+            font-weight: 600;
+            box-shadow: var(--card-shadow);
+            transition: all 0.2s;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border-color);
+            gap: 8px;
+        }
+        .back-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <a href="./dashboard.html" class="back-btn">
+                <i class="fa-solid fa-arrow-left"></i> Back to Dashboard
+            </a>
+            <h1>Core Payroll Database Tables Dictionary</h1>
+            <p class="subtitle">A reference guide to the most critical tables, architectures, and columns governing the end-to-end payroll generation flow.</p>
+        </header>
+
+        <div class="table-card">
+            <h2><i class="fa-solid fa-users"></i> openappointments</h2>
+            <div class="desc-box">
+                The master foundation table representing employee deployment records. All payroll and attendance calculations pivot around records populated here from the CRM/HR system (HUBTPCRM).
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th width="30%">Column Name</th>
+                        <th width="15%">Data Type</th>
+                        <th width="55%">Business Significance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="col-name">emp_code</span> <span class="tag tag-pk">PK</span></td>
+                        <td><span class="col-type">VARCHAR</span></td>
+                        <td>Unique employee identifier used across all systems to track payroll, leaves, and bank transfers.</td>
+                    </tr>
+                    <tr>
+                        <td><span class="col-name">customeraccountid</span> <span class="tag tag-fk">FK</span></td>
+                        <td><span class="col-type">BIGINT</span></td>
+                        <td>Links the employee to their respective employer/client limits and funding (tbl_account).</td>
+                    </tr>
+                    <tr>
+                        <td><span class="col-name">appointment_status_id</span></td>
+                        <td><span class="col-type">INT</span></td>
+                        <td>Must be '11' indicating an active onboarding/deployment state ready for payout routing.</td>
+                    </tr>
+                    <tr>
+                        <td><span class="col-name">converted</span></td>
+                        <td><span class="col-type">VARCHAR(1)</span></td>
+                        <td>Flags whether the candidate successfully converted to an active employee status (value 'Y').</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="table-card">
+            <h2><i class="fa-solid fa-clipboard-user"></i> cmsdownloadedwages</h2>
+            <div class="desc-box">
+                A highly transactional staging table populated by the bulk attendance approval module. Acts as the transition zone between raw timesheets and calculated salary figures.
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th width="30%">Column Name</th>
+                        <th width="15%">Data Type</th>
+                        <th width="55%">Business Significance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="col-name">empcode</span></td>
+                        <td><span class="col-type">VARCHAR</span></td>
+                        <td>Maps attendance records back to the employee.</td>
+                    </tr>
+                    <tr>
+                        <td><span class="col-name">billable_days</span></td>
+                        <td><span class="col-type">NUMERIC</span></td>
+                        <td>Net days the employee worked and expects to log payment for (essential for Prorata logic).</td>
+                    </tr>
+                    <tr>
+                        <td><span class="col-name">loss_of_pay_days</span></td>
+                        <td><span class="col-type">NUMERIC</span></td>
+                        <td>Leaves or absences that trigger a gross amount deduction during the wage generation procedures.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="table-card">
+            <h2><i class="fa-solid fa-money-bill-trend-up"></i> tbl_employeeledger</h2>
+            <div class="desc-box">
+                Central tracking table for variable/custom salary components including allowances, performance bonuses, or ad-hoc deductions (e.g. damages, missing assets).
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th width="30%">Column Name</th>
+                        <th width="15%">Data Type</th>
+                        <th width="55%">Business Significance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="col-name">emp_code</span></td>
+                        <td><span class="col-type">VARCHAR</span></td>
+                        <td>Employee against whom the ledger entry is drawn.</td>
+                    </tr>
+                    <tr>
+                        <td><span class="col-name">amount</span></td>
+                        <td><span class="col-type">NUMERIC</span></td>
+                        <td>The exact financial value to add or deduct from standard earnings.</td>
+                    </tr>
+                    <tr>
+                        <td><span class="col-name">payheadtype</span></td>
+                        <td><span class="col-type">VARCHAR</span></td>
+                        <td>Defines component behavior: e.g. "Allowance" (increases NetPay) vs "Deduction" (decreases NetPay).</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="table-card">
+            <h2><i class="fa-solid fa-receipt"></i> tbl_monthlysalary</h2>
+            <div class="desc-box">
+                The massive monolithic master table for payroll storage. Every processed month creates one row per employee comprising all statutory, gross, deduction, and arrears calculation traces. Highly critical for salary slips and banking.
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th width="30%">Column Name</th>
+                        <th width="15%">Data Type</th>
+                        <th width="55%">Business Significance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="col-name">batchid</span></td>
+                        <td><span class="col-type">VARCHAR</span></td>
+                        <td>Unique tag uniting all records processed simultaneously in a single UI click. Used for isolated commit/rollback.</td>
+                    </tr>
+                    <tr>
+                        <td><span class="col-name">mprmonth / mpryear</span></td>
+                        <td><span class="col-type">INT</span></td>
+                        <td>The exact calendar matrix block (Target Month/Year) the salary line belongs to.</td>
+                    </tr>
+                    <tr>
+                        <td><span class="col-name">netpay</span></td>
+                        <td><span class="col-type">NUMERIC</span></td>
+                        <td>The final calculated payout (Earnings - Deductions). Determines how much goes to the Bank string.</td>
+                    </tr>
+                    <tr>
+                        <td><span class="col-name">issalarydownloaded</span></td>
+                        <td><span class="col-type">VARCHAR</span></td>
+                        <td>Crucial flag ('P' = Paid, 'N' = Unpaid) telling systems whether HDFC / HSBC disbursement has already occurred. Prevents double-payout loops.</td>
+                    </tr>
+                    <tr>
+                        <td><span class="col-name">issalaryorliability</span></td>
+                        <td><span class="col-type">VARCHAR</span></td>
+                        <td>Flag ('S' = Salary, 'L' = Liability) specifying if this represents direct cash payout or an indirect tax/client obligation overhead booking.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="table-card">
+            <h2><i class="fa-solid fa-building-columns"></i> banktransfers</h2>
+            <div class="desc-box">
+                Stores historical records of payments sent out physically through Bank Integrations. Linked directly to the employer payout engine.
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th width="30%">Column Name</th>
+                        <th width="15%">Data Type</th>
+                        <th width="55%">Business Significance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="col-name">bankbatchcode</span></td>
+                        <td><span class="col-type">VARCHAR</span></td>
+                        <td>HDFC / HSBC structured batch code combining "SALAKL" and month tags. Identifies grouping in the physical CSV output.</td>
+                    </tr>
+                    <tr>
+                        <td><span class="col-name">salary</span></td>
+                        <td><span class="col-type">NUMERIC</span></td>
+                        <td>Matches `tbl_monthlysalary.netpay`. Required for auditing anomalies.</td>
+                    </tr>
+                    <tr>
+                        <td><span class="col-name">salmonth / salyear</span></td>
+                        <td><span class="col-type">INT</span></td>
+                        <td>Maps the payment record back to the respective monthly billing run.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="table-card">
+            <h2><i class="fa-solid fa-briefcase"></i> tbl_account (Employers)</h2>
+            <div class="desc-box">
+                Administers overarching customer/employer rules regarding available wallet balances and payout pacing routines.
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th width="30%">Column Name</th>
+                        <th width="15%">Data Type</th>
+                        <th width="55%">Business Significance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="col-name">id</span> <span class="tag tag-pk">PK</span></td>
+                        <td><span class="col-type">BIGINT</span></td>
+                        <td>Employer reference key used to trace aggregated fund allocations.</td>
+                    </tr>
+                    <tr>
+                        <td><span class="col-name">payout_mode_type</span></td>
+                        <td><span class="col-type">VARCHAR</span></td>
+                        <td>'standard' ensures payouts wait for sufficient balance; others bypassed rules inside <code>uspemployerbankpayout</code>.</td>
+                    </tr>
+                    <tr>
+                        <td><span class="col-name">payout_period</span></td>
+                        <td><span class="col-type">VARCHAR</span></td>
+                        <td>'Advance' signals the engine to release salaries prior to standard month-end dates.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="table-card">
+            <h2><i class="fa-solid fa-clock"></i> tbl_monthly_attendance</h2>
+            <div class="desc-box">
+                Captures the unaggregated, raw daily physical/digital punch data. Forms the foundational input for <code>cmsdownloadedwages</code> generation.
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th width="30%">Column Name</th>
+                        <th width="15%">Data Type</th>
+                        <th width="55%">Business Significance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="col-name">emp_code</span></td>
+                        <td><span class="col-type">VARCHAR</span></td>
+                        <td>The employee being tracked.</td>
+                    </tr>
+                    <tr>
+                        <td><span class="col-name">attendance_date</span></td>
+                        <td><span class="col-type">DATE</span></td>
+                        <td>The specific calendar date of the punch.</td>
+                    </tr>
+                    <tr>
+                        <td><span class="col-name">status</span></td>
+                        <td><span class="col-type">VARCHAR</span></td>
+                        <td>Status of the day (e.g., 'Present', 'Absent', 'Half Day', 'Leave').</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="table-card">
+            <h2><i class="fa-solid fa-hand-holding-dollar"></i> tbl_receivables</h2>
+            <div class="desc-box">
+                Manages the wallet and physical cash-flow for customer accounts. Payout algorithms (<code>uspemployerbankpayout</code>) use this to check if a client has sufficient credits before releasing bank transfers.
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th width="30%">Column Name</th>
+                        <th width="15%">Data Type</th>
+                        <th width="55%">Business Significance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="col-name">customeraccountid</span> <span class="tag tag-fk">FK</span></td>
+                        <td><span class="col-type">BIGINT</span></td>
+                        <td>Maps back to the specific employer.</td>
+                    </tr>
+                    <tr>
+                        <td><span class="col-name">entrytype</span></td>
+                        <td><span class="col-type">VARCHAR</span></td>
+                        <td>Defines if this is a 'Receipt' (cash added) or 'Invoice' (liability registered).</td>
+                    </tr>
+                    <tr>
+                        <td><span class="col-name">netamount</span></td>
+                        <td><span class="col-type">NUMERIC</span></td>
+                        <td>The financial quantum added or deducted from the customer's rolling wallet balance.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="table-card">
+            <h2><i class="fa-solid fa-circle-pause"></i> managetemppausedsalary</h2>
+            <div class="desc-box">
+                Administrative override table to intentionally pause/block salaries from hitting the bank transfer batches, regardless of calculation success.
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th width="30%">Column Name</th>
+                        <th width="15%">Data Type</th>
+                        <th width="55%">Business Significance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="col-name">empid</span></td>
+                        <td><span class="col-type">BIGINT</span></td>
+                        <td>The targeted employee whose payout is halted.</td>
+                    </tr>
+                    <tr>
+                        <td><span class="col-name">processmonth / processyear</span></td>
+                        <td><span class="col-type">INT</span></td>
+                        <td>The specific calendar run locked. Null values may imply an indefinite block depending on status.</td>
+                    </tr>
+                    <tr>
+                        <td><span class="col-name">pausedstatus</span></td>
+                        <td><span class="col-type">VARCHAR</span></td>
+                        <td>Flag ('Enable' / 'Disable') evaluated inside <code>uspemployerbankpayout</code> during payout staging.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="table-card">
+            <h2><i class="fa-solid fa-building-shield"></i> tbl_employer_challan_deposit</h2>
+            <div class="desc-box">
+                Captures statutory regulatory deposits performed by the employer for things like PF and ESIC. This governs if statutory obligations reflect as valid liabilities in calculations.
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th width="30%">Column Name</th>
+                        <th width="15%">Data Type</th>
+                        <th width="55%">Business Significance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="col-name">customeraccountid</span> <span class="tag tag-fk">FK</span></td>
+                        <td><span class="col-type">BIGINT</span></td>
+                        <td>The employer remitting the funds.</td>
+                    </tr>
+                    <tr>
+                        <td><span class="col-name">challantype</span></td>
+                        <td><span class="col-type">VARCHAR</span></td>
+                        <td>Type of the deposit ('PF' or 'ESIC').</td>
+                    </tr>
+                    <tr>
+                        <td><span class="col-name">totalchallanamount</span></td>
+                        <td><span class="col-type">NUMERIC</span></td>
+                        <td>The monetary equivalent deposited, aggregated into functions for limit verification.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+</body>
+</html>
