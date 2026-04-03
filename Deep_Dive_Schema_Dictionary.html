@@ -298,6 +298,8 @@
                     openappointments ||--o{ empsalaryregister : "defines pay structure for"
                     openappointments ||--o{ tbl_monthly_attendance : "stamps bio-data for"
                     openappointments ||--o{ cmsdownloadedwages : "stages calculation logic for"
+                    openappointments ||--o{ tbl_employeeledger : "generates ledger adjustments for"
+                    tbl_employeeledger ||--o{ tbl_monthlysalary : "integrates arrears via (disbursedledgerids) into"
                     openappointments ||--o{ tbl_monthlysalary : "generates final payroll array for"
                     tbl_monthlysalary ||--o{ banktransfers : "outputs payout rows for"
                     employer ||--o{ tbl_receivables : "holds wallets for"
@@ -496,6 +498,13 @@
                         </li>
                         <li class="column-item">
                             <div class="col-header">
+                                <span class="col-name">mprmonth / mpryear</span>
+                                <span class="col-type">INT</span>
+                            </div>
+                            <div class="col-desc">The absolute temporal anchors binding the staged roll-up to a specific financial month/year matrix.</div>
+                        </li>
+                        <li class="column-item">
+                            <div class="col-header">
                                 <span class="col-name">attendancemode</span>
                                 <span class="col-type">VARCHAR</span>
                             </div>
@@ -547,12 +556,34 @@
                             </div>
                             <div class="fk-pointer"><i class="fa-solid fa-arrow-turn-up fa-rotate-90"></i> References <strong>openappointments.emp_code</strong></div>
                         </li>
+                        
+                        <!-- Addition: DisbursedLedgerIds -->
+                        <li class="column-item" style="border-left-color: #7dd3fc; background: #faf5ff;">
+                            <div class="col-header">
+                                <div class="col-name-wrapper">
+                                    <span class="col-name">disbursedledgerids</span>
+                                    <span class="key-tag fk-tag" style="background:#f3e8ff; color:#6b21a8; border-color:#d8b4fe;"><i class="fa-solid fa-link"></i> CSV-FK</span>
+                                </div>
+                                <span class="col-type">TEXT (CSV)</span>
+                            </div>
+                            <div class="col-desc">The critical array binding external off-cycle amounts (Increments/Arrears) securely into standard payroll.</div>
+                            <div class="fk-pointer"><i class="fa-solid fa-arrow-turn-up fa-rotate-90"></i> References <strong>tbl_employeeledger.id</strong></div>
+                        </li>
+
+                        <!-- Addition: Batch ID -->
+                        <li class="column-item">
+                            <div class="col-header">
+                                <span class="col-name">batchid</span>
+                                <span class="col-type">VARCHAR</span>
+                            </div>
+                            <div class="col-desc">Execution group routing ID. Forces atomic bounds around massive cohorts for easy mass deletion or commit.</div>
+                        </li>
+
                         <li class="column-item">
                             <div class="col-header">
                                 <span class="col-name">issalaryorliability</span>
                                 <span class="col-type">VARCHAR</span>
                             </div>
-                            <div class="col-desc">Hard-stops the row designation. Identifies if the numeric <code>netpay</code> represents cash owed vs accounting burden.</div>
                             <div class="col-values">
                                 <span class="val-tag val-tag-success">S = Salary Equivalent</span>
                                 <span class="val-tag val-tag-warn">L = Tax/Compliance Liability</span>
@@ -563,11 +594,91 @@
                                 <span class="col-name">issalarydownloaded</span>
                                 <span class="col-type">VARCHAR</span>
                             </div>
-                            <div class="col-desc">The critical payout flag to safely identify batches without sending duplicates to banks.</div>
                             <div class="col-values">
                                 <span class="val-tag val-tag-success">P = Processing Finalized/Paid</span>
                                 <span class="val-tag val-tag-warn">H = Held</span>
                                 <span class="val-tag">NULL = Pending Disbursement</span>
+                            </div>
+                        </li>
+                        
+                        <!-- Addition: is_rejected -->
+                        <li class="column-item" style="border-left-color: #fca5a5;">
+                            <div class="col-header">
+                                <div class="col-name-wrapper">
+                                    <span class="col-name">is_rejected</span>
+                                    <span class="key-tag soft-delete-tag"><i class="fa-solid fa-triangle-exclamation"></i> VETO FLAG</span>
+                                </div>
+                                <span class="col-type">BIT</span>
+                            </div>
+                            <div class="col-desc">Administrator Veto override, killing physical finalisation before the banking stage is breached. (0 = Active, 1 = Bounced).</div>
+                        </li>
+
+                    </ul>
+                </div>
+
+                <!-- NEW: Employee Ledger Bridge -->
+                <div class="schema-card">
+                    <h3><i class="fa-solid fa-money-bill-transfer"></i> tbl_employeeledger</h3>
+                    <div style="background: #fdf4ff; color: #86198f; padding: 10px 15px; border-radius: 6px; font-size: 0.9rem; margin-bottom: 1rem; border: 1px solid #fae8ff;">
+                        <strong>The Increments & Arrears Bridge:</strong> A staging queue managing non-standard amounts awaiting physical pull into standard salaries via <code>disbursedledgerids</code>.
+                    </div>
+                    <ul class="column-list">
+                        <li class="column-item" style="border-left-color: #fca5a5;">
+                            <div class="col-header">
+                                <div class="col-name-wrapper">
+                                    <span class="col-name">id</span>
+                                    <span class="key-tag pk-tag"><i class="fa-solid fa-key"></i> PK</span>
+                                </div>
+                                <span class="col-type">BIGINT</span>
+                            </div>
+                        </li>
+                        <li class="column-item" style="border-left-color: #7dd3fc;">
+                            <div class="col-header">
+                                <div class="col-name-wrapper">
+                                    <span class="col-name">emp_code</span>
+                                    <span class="key-tag fk-tag"><i class="fa-solid fa-link"></i> FK</span>
+                                </div>
+                                <span class="col-type">BIGINT</span>
+                            </div>
+                            <div class="fk-pointer"><i class="fa-solid fa-arrow-turn-up fa-rotate-90"></i> References <strong>openappointments.emp_code</strong></div>
+                        </li>
+                        <li class="column-item">
+                            <div class="col-header">
+                                <span class="col-name">masterhead</span>
+                                <span class="col-type">VARCHAR</span>
+                            </div>
+                            <div class="col-values">
+                                <span class="val-tag">Additional income</span>
+                                <span class="val-tag">Reimbursement</span>
+                                <span class="val-tag">Advance</span>
+                                <span class="val-tag">Deduction</span>
+                            </div>
+                        </li>
+                        <li class="column-item" style="border-left-color: #fcd34d;">
+                            <div class="col-header">
+                                <div class="col-name-wrapper">
+                                    <span class="col-name">isledgerdisbursed</span>
+                                    <span class="key-tag soft-delete-tag"><i class="fa-solid fa-lock"></i> STATE FLAG</span>
+                                </div>
+                                <span class="col-type">BIT</span>
+                            </div>
+                            <div class="col-desc">Locks the ledger completely out of processing the second it sweeps into tbl_monthlysalary.</div>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="schema-card">
+                    <h3><i class="fa-solid fa-circle-pause"></i> managetemppausedsalary</h3>
+                    <ul class="column-list">
+                        <li class="column-item">
+                            <div class="col-header">
+                                <span class="col-name">pausedstatus</span>
+                                <span class="col-type">VARCHAR</span>
+                            </div>
+                            <div class="col-desc">Administrative override actively stopping the employee from passing to the banking engine.</div>
+                            <div class="col-values">
+                                <span class="val-tag val-tag-warn">Enable = Actively Blocked</span>
+                                <span class="val-tag val-tag-success">Disable = Resumed</span>
                             </div>
                         </li>
                     </ul>
