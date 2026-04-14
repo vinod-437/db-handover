@@ -1119,357 +1119,398 @@ from
 	if nullif(trim(p_batch_no),'') is not null then
 		v_querytext := v_querytext || ' and cmsdownloadedwages.batch_no='''||p_batch_no||'''';
 	end if;
----------------------New Part Added---------------------------------
-v_querytext:=v_querytext||'	left join 
-(
-select salaryid,candidate_id,sum(otherdeductions) otherdeductions
+	/* =================================================================================================
+	-- 15.h. OTHER DEDUCTIONS AGGREGATION
+	-- Calculates recurring flat monthly deductions (except exclusions like Meal Vouchers / Security).
+	-- ================================================================================================= */
+	v_querytext := v_querytext || '	
+		left join (
+			select salaryid, candidate_id, sum(otherdeductions) as otherdeductions
+			from (
+				/* Fixed frequency non-monthly deductions */
+				select salaryid, candidate_id, sum(deduction_amount) as otherdeductions
+				from public.trn_candidate_otherduction
+				where public.trn_candidate_otherduction.active=''Y''
+					and coalesce(trn_candidate_otherduction.includedinctc,''N'')=''Y'' 
+					and coalesce(isvariable,''N'')=''N''  --change 1.8
+					and trn_candidate_otherduction.deduction_id not in (7,10)
+					and trn_candidate_otherduction.deduction_frequency in (''Quarterly'',''Half Yearly'',''Annually'')
+				group by salaryid, public.trn_candidate_otherduction.candidate_id	  
 
-from
-(select salaryid,candidate_id,sum(deduction_amount) otherdeductions
-				   from public.trn_candidate_otherduction
-				   where (public.trn_candidate_otherduction.active=''Y''
-				  and coalesce(trn_candidate_otherduction.includedinctc,''N'')=''Y'' 
-				  and coalesce(isvariable,''N'')=''N''  --change 1.8
-				 -- and trn_candidate_otherduction.deduction_id not in (5,6,7,10)
-				  and trn_candidate_otherduction.deduction_id not in (7,10)
-				  and trn_candidate_otherduction.deduction_frequency in (''Quarterly'',''Half Yearly'',''Annually''))
-				  group by salaryid,public.trn_candidate_otherduction.candidate_id	  
+				union all
+				
+				/* Monthly flat deductions */
+				select salaryid, candidate_id, sum(deduction_amount)*1 as otherdeductions
+				from public.trn_candidate_otherduction
+				inner join mst_otherduction motd on motd.id = trn_candidate_otherduction.deduction_id
+				where public.trn_candidate_otherduction.active=''Y''
+					and deduction_amount > 0
+					and trn_candidate_otherduction.deduction_frequency in (''Monthly'')
+					and trn_candidate_otherduction.deduction_id not in (5,6,7,10)
+					and coalesce(trn_candidate_otherduction.is_taxable,''N'')=''N''
+					and motd.id <> 134 --Meal Voucher ID
+				group by salaryid, public.trn_candidate_otherduction.candidate_id  
+			) tblotherdeductions
+			group by salaryid, candidate_id 
+		) tblotherdeductions on openappointments.emp_id = tblotherdeductions.candidate_id and empsalaryregister.id = tblotherdeductions.salaryid
 
-union all				  
-				select salaryid,candidate_id,sum(deduction_amount)*1 otherdeductions
-				   from public.trn_candidate_otherduction
-				   inner join mst_otherduction motd on motd.id=trn_candidate_otherduction.deduction_id
-				   where public.trn_candidate_otherduction.active=''Y''
-				   and deduction_amount>0
-				  and trn_candidate_otherduction.deduction_frequency in (''Monthly'')
-				  and trn_candidate_otherduction.deduction_id not in (5,6,7,10)
-				  and coalesce(trn_candidate_otherduction.is_taxable,''N'')=''N''
-				  and motd.id<>134 --Meal Voucher ID
-																			 
-				  group by salaryid,public.trn_candidate_otherduction.candidate_id  
-	  
-				  ) tblotherdeductions
-	group by salaryid,candidate_id 
-	)tblotherdeductions
-		          on openappointments.emp_id=tblotherdeductions.candidate_id
-				  and empsalaryregister.id=tblotherdeductions.salaryid
----------------Added for PI and OT with ESI --------------------------					  
-left join (select salaryid,candidate_id,sum(deduction_amount) otherdeductionswithesi
-					,string_agg(deduction_name||'':''||deduction_amount,'','') customtaxablecomponents
-				   from public.trn_candidate_otherduction
-				   inner join mst_otherduction motd on motd.id=trn_candidate_otherduction.deduction_id
-				   where public.trn_candidate_otherduction.active=''Y'' 
-				   and motd.deduction_name not in (''Medical Expenses'')
-				   and deduction_amount>0
-				  and (trn_candidate_otherduction.deduction_id in (5,6) or coalesce(trn_candidate_otherduction.is_taxable,''N'')=''Y'')
-				  and trn_candidate_otherduction.deduction_frequency in (''Monthly'')
-				  and motd.id<>134 --Meal Voucher ID
-				  group by salaryid,public.trn_candidate_otherduction.candidate_id) tblotherdeductionswithesi
-		          on openappointments.emp_id=tblotherdeductionswithesi.candidate_id
-				  and empsalaryregister.id=tblotherdeductionswithesi.salaryid
-------------------------------change 1.11 added----------------------------------------
-left join (select salaryid,candidate_id,sum(deduction_amount) variablevpf
-				   from public.trn_candidate_otherduction
-				   where public.trn_candidate_otherduction.active=''Y'' 
-				  and trn_candidate_otherduction.deduction_id =10
-				  group by salaryid,public.trn_candidate_otherduction.candidate_id) tblvariablevpf
-		          on openappointments.emp_id=tblvariablevpf.candidate_id
-				  and empsalaryregister.id=tblvariablevpf.salaryid	
-----------------change 1.1 ------------------------------------------------------
-left join (
-select emp_code,sum(otherledgerarear) otherledgerarear,
-sum(otherledgerdeductions) otherledgerdeductions,
-sum(otherledgerarearwithoutesi) otherledgerarearwithoutesi
-,STRING_AGG (disbursedledgerids::text,'','') disbursedledgerids
-,sum(othertaxablerefunds) othertaxablerefunds
-,sum(security_amt) security_amt
-,sum(conveyance) conveyance
-,sum(tdsadjustment) tdsadjustment from (
-select emp_code,sum(case when amount>0 and (headid in (5,6) or coalesce(tbl_employeeledger.is_taxable,''N'')=''Y'' /* mst_otherduction.applicationtype=''TP''*/ ) then amount else 0 end) otherledgerarear
-						,sum(case when amount<0 and coalesce(tbl_employeeledger.is_taxable,''N'')=''N'' and headid not in (12) then amount else 0 end)*-1 otherledgerdeductions
-						,sum(case when amount>0 and (headid not in (5,6,12) and coalesce(tbl_employeeledger.is_taxable,''N'')=''N'' /*mst_otherduction.applicationtype<>''TP''*/) then amount else 0 end) otherledgerarearwithoutesi
-						,sum(case when headid =12 then amount else 0 end) tdsadjustment
-						,STRING_AGG (tbl_employeeledger.id::text,'','') disbursedledgerids
-						,sum(case when amount<0 and coalesce(tbl_employeeledger.is_taxable,''N'')=''Y''and headid not in (12) then amount else 0 end) othertaxablerefunds
-						,0 security_amt
-						,0 conveyance
-				   from tbl_employeeledger inner join mst_otherduction on tbl_employeeledger.headid= mst_otherduction.id
-				   where tbl_employeeledger.isactive=''1'' 
-				  and processmonth='||p_mprmonth||'
-				  and processyear='||p_mpryear||'
-				  and tbl_employeeledger.id not in (select  trim(regexp_split_to_table(dl.disbursedledgerids,'',''))::bigint from tbl_monthlysalary dl where dl.mprmonth='||p_mprmonth||' and dl.mpryear='||p_mpryear||' and coalesce(dl.is_rejected,''0'')<>''1'')
-				  group by emp_code
-			union all
-		/*Below code for security amount dated 04-July2021*/
-			select 
-			emp_code,sum(case when deduction_amount>0 then deduction_amount else 0 end) otherledgerarear
-					,0 otherledgerdeductions
-					,0 otherledgerarearwithoutesi
-					,0 tdsadjustment
-					,null disbursedledgerids
-					,0 othertaxablerefunds
-					,sum(case when deduction_amount<0 then deduction_amount else 0 end)*-1 security_amt
-					,0 conveyance
-				   from public.trn_candidate_otherduction inner join openappointments
-				   on trn_candidate_otherduction.candidate_id= openappointments.emp_id
-				   where public.trn_candidate_otherduction.active=''Y''
-				  and trn_candidate_otherduction.deduction_id =7
-				  
-				 
-	
-				  group by emp_code
-				  	/*Below code for security amount dated 04-July2021 ends here*/
-					
-			/*change 1.24 starts*/		
-			union all
-			select 
-			emp_code,0 otherledgerarear
-					,0 otherledgerdeductions
-					,0 otherledgerarearwithoutesi
-					,0 tdsadjustment
-					,null disbursedledgerids
-					,0 othertaxablerefunds
-					,0
-					,sum(case when deduction_amount>0 then deduction_amount else 0 end) conveyance
-				   from public.trn_candidate_otherduction inner join openappointments
-				   on trn_candidate_otherduction.candidate_id= openappointments.emp_id
-				   inner join mst_otherduction motd on motd.id=trn_candidate_otherduction.deduction_id
-				   where public.trn_candidate_otherduction.active=''Y''
-				   and trn_candidate_otherduction.deduction_frequency=''Monthly''
-				  and motd.id<>134 --Meal Voucher ID
-				  and trn_candidate_otherduction.deduction_id =87
-				  group by emp_code
-				  			/*change 1.24 ends*/	
-				  ) tblotherledger1 group by emp_code
-				  ) tblotherledger
-		          on cmsdownloadedwages.empcode::bigint=tblotherledger.emp_code  				  
----------------Added Meal Voucher --------------------------					  
-left join (select salaryid,candidate_id,sum(deduction_amount) mealvoucher
-				   from public.trn_candidate_otherduction
-				   inner join mst_otherduction motd on motd.id=trn_candidate_otherduction.deduction_id
-				   where public.trn_candidate_otherduction.active=''Y'' 
-				   and deduction_amount>0
-				  --and trn_candidate_otherduction.deduction_frequency in (''Monthly'')
-				  and motd.id=134 --Meal Voucher ID
-				  group by salaryid,public.trn_candidate_otherduction.candidate_id) tblmealvoucher
-		          on openappointments.emp_id=tblmealvoucher.candidate_id
-				  and empsalaryregister.id=tblmealvoucher.salaryid 	
-----------------------------------------------------------------------	
-	left join (select salaryid,candidate_id,sum(deduction_amount) othervariables
-	,string_agg(deduction_name||'':''||deduction_amount,'','') customnontaxablecomponents
-				   from public.trn_candidate_otherduction
-				   inner join mst_otherduction motd on motd.id=trn_candidate_otherduction.deduction_id
-				   where public.trn_candidate_otherduction.active=''Y''
-				   and motd.deduction_name not in (''Conveyance'')
-				   and deduction_amount>0
-				  --and coalesce(trn_candidate_otherduction.includedinctc,''N'')=''N'' 
-				  and trn_candidate_otherduction.deduction_frequency in (''Monthly'')
-				  and trn_candidate_otherduction.deduction_id not in (5,6,7,10)
-				  and coalesce(trn_candidate_otherduction.is_taxable,''N'')=''N''
-				  and motd.id<>134 --Meal Voucher ID
-				  group by salaryid,public.trn_candidate_otherduction.candidate_id) tblothervariables
-		          on openappointments.emp_id=tblothervariables.candidate_id
-				  and empsalaryregister.id=tblothervariables.salaryid
--------------------------------------------------------------------------	
-left join (select emp_code,sum(basic) basicalreadypaid,sum(epf) epfalreadydeducted
-									,sum(coalesce(Ac_1,0)) Ac_1alreadydeducted
-									,sum(coalesce(Ac_10,0)) ac_10alreadydeducted
-									,sum(coalesce(Ac_2,0)) ac_2alreadydeducted
-									,sum(coalesce(Ac21,0)) ac_21alreadydeducted
-									,sum(insurance) alreadyinsurance
-									,sum(insuranceamount) alreadyinsuranceamount
-									,sum(familyinsurance) alreadyfamilyfamilyinsurance
-									,sum(otherledgerarears) alreadyotherledgerarears
-									,sum(otherledgerdeductions) alreadyotherledgerdeductions
-									,sum(tds) alreadytds
-									,sum(other) alreadyother
-									,sum(otherledgerarearwithoutesi) otherledgerarearwithoutesialready
-									,sum(lwf) lwfalready
-									,sum(lwf_employee) lwf_employeealready
-									,sum(lwf_employer) lwf_employeralready
-									,sum(ews) ewsalready
-									,sum(gratuity) gratuityalready
-									,sum(bonus) bonusalready
-									,sum(tdsadjustment) alreadytdsadjustment
-									,sum(security_amt) alreadysecurity_amt
-									,sum(grossearning) alreadygrossearning
-									,sum(coalesce(nullif(pfapplicablecomponents,0),basic) ) pfapplicablecomponentsalreadypaid
-									,sum(employerinsuranceamount) alreadyemployerinsuranceamount
-									,sum(mealvoucher) alreadymealvoucher
+	/* =================================================================================================
+	-- 15.i. TAXABLE COMPONENTS & OTHER DEDUCTIONS WITH ESI
+	-- Gets variables like Performance Incentives (PI) and OT that are configured to attract ESI liability.
+	-- ================================================================================================= */					  
+		left join (
+			select salaryid, candidate_id, sum(deduction_amount) as otherdeductionswithesi
+				, string_agg(deduction_name || '':'' || deduction_amount, '','') as customtaxablecomponents
+			from public.trn_candidate_otherduction
+			inner join mst_otherduction motd on motd.id = trn_candidate_otherduction.deduction_id
+			where public.trn_candidate_otherduction.active=''Y'' 
+				and motd.deduction_name not in (''Medical Expenses'')
+				and deduction_amount > 0
+				and (trn_candidate_otherduction.deduction_id in (5,6) or coalesce(trn_candidate_otherduction.is_taxable,''N'')=''Y'')
+				and trn_candidate_otherduction.deduction_frequency in (''Monthly'')
+				and motd.id <> 134 --Meal Voucher ID
+			group by salaryid, public.trn_candidate_otherduction.candidate_id
+		) tblotherdeductionswithesi on openappointments.emp_id = tblotherdeductionswithesi.candidate_id and empsalaryregister.id = tblotherdeductionswithesi.salaryid
 
-from tbl_monthlysalary 
-where mprmonth='||p_mprmonth||'
-and mpryear='||p_mpryear||'
-and coalesce(is_rejected,''0'')<>''1''
-group by emp_code) tblalreadypf
-on tblalreadypf.emp_code=openappointments.emp_code
------------------change 1.17 starts------------------------------------------
-left join (
-select coalesce(nullif(trim(op2.pancard),''''),op2.emp_code::text) taxpancard,sum(currentmonthtaxdeducted)	currentmonthtaxdeducted from(
-	select emp_code
-,sum(case when 
-	(
-	 (
-	  (
-	
+	/* =================================================================================================
+	-- 15.j. VARIABLE VPF
+	-- Pulls Variable Provident Fund deductions (Code 10).
+	-- ================================================================================================= */
+		left join (
+			select salaryid, candidate_id, sum(deduction_amount) as variablevpf
+			from public.trn_candidate_otherduction
+			where public.trn_candidate_otherduction.active=''Y'' 
+				and trn_candidate_otherduction.deduction_id = 10
+			group by salaryid, public.trn_candidate_otherduction.candidate_id
+		) tblvariablevpf on openappointments.emp_id = tblvariablevpf.candidate_id and empsalaryregister.id = tblvariablevpf.salaryid	
+
+	/* =================================================================================================
+	-- 15.k. EMPLOYEE LEDGER ARREARS & DEDUCTIONS
+	-- Retrieves one-time additions or deductions pushed via Employee Ledger (e.g., TDS adjustments,
+	-- missed salary compensation, security amounts). Prevents re-fetching already disbursed ledger entries.
+	-- ================================================================================================= */
+		left join (
+			select emp_code, sum(otherledgerarear) as otherledgerarear,
+				sum(otherledgerdeductions) as otherledgerdeductions,
+				sum(otherledgerarearwithoutesi) as otherledgerarearwithoutesi,
+				STRING_AGG(disbursedledgerids::text, '','') as disbursedledgerids,
+				sum(othertaxablerefunds) as othertaxablerefunds,
+				sum(security_amt) as security_amt,
+				sum(conveyance) as conveyance,
+				sum(tdsadjustment) as tdsadjustment 
+			from (
+				select emp_code
+						, sum(case when amount>0 and (headid in (5,6) or coalesce(tbl_employeeledger.is_taxable,''N'')=''Y'') then amount else 0 end) as otherledgerarear
+						, sum(case when amount<0 and coalesce(tbl_employeeledger.is_taxable,''N'')=''N'' and headid not in (12) then amount else 0 end) * -1 as otherledgerdeductions
+						, sum(case when amount>0 and (headid not in (5,6,12) and coalesce(tbl_employeeledger.is_taxable,''N'')=''N'') then amount else 0 end) as otherledgerarearwithoutesi
+						, sum(case when headid = 12 then amount else 0 end) as tdsadjustment
+						, STRING_AGG(tbl_employeeledger.id::text, '','') as disbursedledgerids
+						, sum(case when amount<0 and coalesce(tbl_employeeledger.is_taxable,''N'')=''Y'' and headid not in (12) then amount else 0 end) as othertaxablerefunds
+						, 0 as security_amt
+						, 0 as conveyance
+				from tbl_employeeledger 
+				inner join mst_otherduction on tbl_employeeledger.headid = mst_otherduction.id
+				where tbl_employeeledger.isactive=''1'' 
+					and processmonth='||p_mprmonth||'
+					and processyear='||p_mpryear||'
+					and tbl_employeeledger.id not in (
+						select trim(regexp_split_to_table(dl.disbursedledgerids,'',''))::bigint 
+						from tbl_monthlysalary dl 
+						where dl.mprmonth='||p_mprmonth||' and dl.mpryear='||p_mpryear||' and coalesce(dl.is_rejected,''0'')<>''1''
+					)
+				group by emp_code
+				
+				union all
+				
+				/* Security amount deductions */
+				select emp_code, sum(case when deduction_amount>0 then deduction_amount else 0 end) as otherledgerarear
+						, 0 as otherledgerdeductions
+						, 0 as otherledgerarearwithoutesi
+						, 0 as tdsadjustment
+						, null as disbursedledgerids
+						, 0 as othertaxablerefunds
+						, sum(case when deduction_amount<0 then deduction_amount else 0 end) * -1 as security_amt
+						, 0 as conveyance
+				from public.trn_candidate_otherduction 
+				inner join openappointments on trn_candidate_otherduction.candidate_id = openappointments.emp_id
+				where public.trn_candidate_otherduction.active=''Y''
+					and trn_candidate_otherduction.deduction_id = 7
+				group by emp_code
+				
+				union all
+				
+				/* Monthly Conveyance overrides (Code 87) */
+				select emp_code, 0 as otherledgerarear
+						, 0 as otherledgerdeductions
+						, 0 as otherledgerarearwithoutesi
+						, 0 as tdsadjustment
+						, null as disbursedledgerids
+						, 0 as othertaxablerefunds
+						, 0 as security_amt
+						, sum(case when deduction_amount>0 then deduction_amount else 0 end) as conveyance
+				from public.trn_candidate_otherduction 
+				inner join openappointments on trn_candidate_otherduction.candidate_id = openappointments.emp_id
+				inner join mst_otherduction motd on motd.id = trn_candidate_otherduction.deduction_id
+				where public.trn_candidate_otherduction.active=''Y''
+					and trn_candidate_otherduction.deduction_frequency=''Monthly''
+					and motd.id <> 134 
+					and trn_candidate_otherduction.deduction_id = 87
+				group by emp_code
+			) tblotherledger1 
+			group by emp_code
+		) tblotherledger on cmsdownloadedwages.empcode::bigint = tblotherledger.emp_code  				  
+
+	/* =================================================================================================
+	-- 15.l. MEAL VOUCHERS
+	-- Meal Voucher deductions (Code 134).
+	-- ================================================================================================= */					  
+		left join (
+			select salaryid, candidate_id, sum(deduction_amount) as mealvoucher
+			from public.trn_candidate_otherduction
+			inner join mst_otherduction motd on motd.id = trn_candidate_otherduction.deduction_id
+			where public.trn_candidate_otherduction.active=''Y'' 
+				and deduction_amount > 0
+				and motd.id = 134
+			group by salaryid, public.trn_candidate_otherduction.candidate_id
+		) tblmealvoucher on openappointments.emp_id = tblmealvoucher.candidate_id and empsalaryregister.id = tblmealvoucher.salaryid 	
+
+	/* =================================================================================================
+	-- 15.m. OTHER NON-TAXABLE VARIABLES
+	-- Additional monthly components that are non-taxable and don't attract ESI.
+	-- ================================================================================================= */	
+		left join (
+			select salaryid, candidate_id, sum(deduction_amount) as othervariables
+				, string_agg(deduction_name || '':'' || deduction_amount, '','') as customnontaxablecomponents
+			from public.trn_candidate_otherduction
+			inner join mst_otherduction motd on motd.id = trn_candidate_otherduction.deduction_id
+			where public.trn_candidate_otherduction.active=''Y''
+				and motd.deduction_name not in (''Conveyance'')
+				and deduction_amount > 0
+				and trn_candidate_otherduction.deduction_frequency in (''Monthly'')
+				and trn_candidate_otherduction.deduction_id not in (5,6,7,10)
+				and coalesce(trn_candidate_otherduction.is_taxable,''N'')=''N''
+				and motd.id <> 134
+			group by salaryid, public.trn_candidate_otherduction.candidate_id
+		) tblothervariables on openappointments.emp_id = tblothervariables.candidate_id and empsalaryregister.id = tblothervariables.salaryid
+	';
+	/* =================================================================================================
+	-- 15.n. ALREADY PAID / PROCESSED COMPONENTS
+	-- Aggregates values that have already been processed in the current month/year to prevent duplicate payouts.
+	-- ================================================================================================= */
+	v_querytext := v_querytext || '
+		left join (
+			select emp_code, sum(basic) as basicalreadypaid, sum(epf) as epfalreadydeducted
+				, sum(coalesce(Ac_1,0)) as Ac_1alreadydeducted
+				, sum(coalesce(Ac_10,0)) as ac_10alreadydeducted
+				, sum(coalesce(Ac_2,0)) as ac_2alreadydeducted
+				, sum(coalesce(Ac21,0)) as ac_21alreadydeducted
+				, sum(insurance) as alreadyinsurance
+				, sum(insuranceamount) as alreadyinsuranceamount
+				, sum(familyinsurance) as alreadyfamilyfamilyinsurance
+				, sum(otherledgerarears) as alreadyotherledgerarears
+				, sum(otherledgerdeductions) as alreadyotherledgerdeductions
+				, sum(tds) as alreadytds
+				, sum(other) as alreadyother
+				, sum(otherledgerarearwithoutesi) as otherledgerarearwithoutesialready
+				, sum(lwf) as lwfalready
+				, sum(lwf_employee) as lwf_employeealready
+				, sum(lwf_employer) as lwf_employeralready
+				, sum(ews) as ewsalready
+				, sum(gratuity) as gratuityalready
+				, sum(bonus) as bonusalready
+				, sum(tdsadjustment) as alreadytdsadjustment
+				, sum(security_amt) as alreadysecurity_amt
+				, sum(grossearning) as alreadygrossearning
+				, sum(coalesce(nullif(pfapplicablecomponents,0),basic) ) as pfapplicablecomponentsalreadypaid
+				, sum(employerinsuranceamount) as alreadyemployerinsuranceamount
+				, sum(mealvoucher) as alreadymealvoucher
+			from tbl_monthlysalary 
+			where mprmonth='||p_mprmonth||'
+				and mpryear='||p_mpryear||'
+				and coalesce(is_rejected,''0'')<>''1''
+			group by emp_code
+		) tblalreadypf on tblalreadypf.emp_code = openappointments.emp_code
+
+	/* =================================================================================================
+	-- 15.o. CURRENT MONTH TAX DEDUCTION TRACKING
+	-- Identifies tax deductions across regular and liability payrolls tracking by PAN / EmpCode.
+	-- Handles complex overlaps for advance salaries.
+	-- ================================================================================================= */
+		left join (
+			select coalesce(nullif(trim(op2.pancard),''''), op2.emp_code::text) as taxpancard, sum(currentmonthtaxdeducted) as currentmonthtaxdeducted 
+			from (
+				select emp_code, sum(case when 
+					(
 						(
-							to_date(left(hrgeneratedon,11),''dd Mon yyyy'')
-							between '''||v_salstartdate::date||'''  and '''||v_salenddate::date ||'''
-							and to_date((mpryear::text||''-''||lpad(mprmonth::text,2,''0'')||''-01''),''yyyy-mm-dd'')<'''||v_salstartdate::date||'''
+							(
+								(
+									to_date(left(hrgeneratedon,11),''dd Mon yyyy'') between '''||v_salstartdate::date||''' and '''||v_salenddate::date ||'''
+									and to_date((mpryear::text||''-''||lpad(mprmonth::text,2,''0'')||''-01''),''yyyy-mm-dd'') < '''||v_salstartdate::date||'''
+								)
+								or
+								(	
+									to_date(left(hrgeneratedon,11),''dd Mon yyyy'') between '''||v_advancesalstartdate::date||''' and '''||v_advancesalenddate::date||'''	
+									and mprmonth='||p_mprmonth||' and mpryear='||p_mpryear||'
+								)
+							)
+							and attendancemode<>''Ledger''
 						)
-					or
-						(	
-						to_date(left(hrgeneratedon,11),''dd Mon yyyy'')
-						 between '''||v_advancesalstartdate::date||'''  and '''||v_advancesalenddate::date||'''	
-							and mprmonth='||p_mprmonth||' and mpryear='||p_mpryear||'
-						)
-			)
-	   and attendancemode<>''Ledger''
-	   )
-		or(to_date(left(hrgeneratedon,11),''dd Mon yyyy'')	between '''||v_advancestartdate::date||'''  and '''||v_advancesalenddate::date||'''  and attendancemode=''Ledger'')	  
-	 )
-	 then tds else 0 end) as currentmonthtaxdeducted
-from (select emp_code,tds,grossearning,voucher_amount,otherdeductions,hrgeneratedon,is_rejected,mprmonth,mpryear,attendancemode
-	  from tbl_monthlysalary
-	 where  ';
-	if p_criteria='Employee' then	  
-		v_querytext:=v_querytext||' 	 
-		 (tbl_monthlysalary.emp_code='||p_emp_code||' or tbl_monthlysalary.emp_code in (select emp_code from openappointments where coalesce(nullif(trim(pancard),''''),''-6666'')='''||coalesce(v_pancard,'-7777')||''')) and ';
-	end if;
-	v_querytext:=v_querytext||' (( (
-			to_date(left(tbl_monthlysalary.hrgeneratedon,11),''dd Mon yyyy'')
-				between '''||v_startdate::date||'''  and '''||v_enddate::date||'''	 
-			or
-				(
-				to_date(left(tbl_monthlysalary.hrgeneratedon,11),''dd Mon yyyy'')
-				between '''||v_advancestartdate::date ||'''  and '''||v_advanceenddate::date||'''		 
-				and mprmonth=4 and mpryear='||v_year1||'
-				 )
-			)
-	   and attendancemode<>''Ledger''
-	   )
-		or(to_date(left(tbl_monthlysalary.hrgeneratedon,11),''dd Mon yyyy'') between '''||v_advancestartdate::date ||'''  and '''||v_advanceenddate::date||''' and attendancemode=''Ledger'')	  
-	 )
-	  	  	and not(mprmonth=4 and mpryear='||v_year2||')
-		   and coalesce(is_rejected,''0'')<>''1''
-	 union all
-	  select emp_code,tds,grossearning,voucher_amount,otherdeductions,hrgeneratedon,is_rejected,mprmonth,mpryear,attendancemode
-	from tbl_monthly_liability_salary
-	where ';
-	if p_criteria='Employee' then	  
-		v_querytext:=v_querytext||' 	 
-		 (tbl_monthly_liability_salary.emp_code='||p_emp_code||' or tbl_monthly_liability_salary.emp_code in (select emp_code from openappointments where coalesce(nullif(trim(pancard),''''),''-6666'')='''||coalesce(v_pancard,'-7777')||''')) and ';
-	end if;
-	v_querytext:=v_querytext||'  coalesce(salary_remarks,'''')<>''Invalid Paid Days''
-	and coalesce(is_rejected,''0'')=''0''
-	------------------------------------------------------------------------------------
-	and (emp_code,mprmonth, mpryear, batchid) not in
-		(select '||p_emp_code||','||p_mprmonth||', '||p_mpryear||', '''||p_batch_no||''') 	
-	and (emp_code,mprmonth, mpryear, batchid||transactionid) not in
-		(select '||p_emp_code||','||p_mprmonth||', '||p_mpryear||', '''||p_batch_no||''') 		  
-	----------------------------------------------------------------------------------------	  
-	  	 and not(mprmonth=4 and mpryear='||v_year2||')
-	  	 and (
-			to_date(left(tbl_monthly_liability_salary.hrgeneratedon,11),''dd Mon yyyy'')
-				between '''||v_startdate::date||'''  and '''||v_enddate::date||'''	 
-			or
-				(
-				to_date(left(tbl_monthly_liability_salary.hrgeneratedon,11),''dd Mon yyyy'')
-				between '''||v_advancestartdate::date||'''  and '''||v_advanceenddate::date||'''		 
-				and mprmonth=4 and mpryear='||v_year1||'
-				 )
-			)
------------------------------------------------------------------------	  
-	and (emp_code,mprmonth, mpryear, batchid) not in
-	  (
-	(select emp_code,mprmonth, mpryear, batchid 
-		 from tbl_monthlysalary 
-	 	where ';
-	if p_criteria='Employee' then	  
-		v_querytext:=v_querytext||' 	 
-		 (tbl_monthlysalary.emp_code='||p_emp_code||' or tbl_monthlysalary.emp_code in (select emp_code from openappointments where coalesce(nullif(trim(pancard),''''),''-6666'')='''||coalesce(v_pancard,'-7777')||''')) and ';
-	end if;
-	v_querytext:=v_querytext||' (
-			to_date(left(tbl_monthlysalary.hrgeneratedon,11),''dd Mon yyyy'')
-				between '''||v_startdate::date||'''  and '''||v_enddate::date||'''	 
-			or
-				(
-				to_date(left(tbl_monthlysalary.hrgeneratedon,11),''dd Mon yyyy'')
-				between '''||v_advancestartdate::date||'''  and '''||v_advanceenddate::date||'''		 
-				and mprmonth=4 and mpryear='||v_year1||'
-				 )
-			)
-	 and coalesce(is_rejected,''0'')=''0''
-	)
-union all
-	(select emp_code,mprmonth, mpryear, batchid ||coalesce(transactionid::text,'''')
-		 from tbl_monthlysalary 
-	 where  ';
-	if p_criteria='Employee' then	  
-		v_querytext:=v_querytext||' 	 
-		 (tbl_monthlysalary.emp_code='||p_emp_code||' or tbl_monthlysalary.emp_code in (select emp_code from openappointments where coalesce(nullif(trim(pancard),''''),''-6666'')='''||coalesce(v_pancard,'-7777')||''')) and ';
-	end if;
-	v_querytext:=v_querytext||'(
-			to_date(left(tbl_monthlysalary.hrgeneratedon,11),''dd Mon yyyy'')
-				between '''||v_startdate::date||'''  and '''||v_enddate||'''	 
-			or
-				(
-				to_date(left(tbl_monthlysalary.hrgeneratedon,11),''dd Mon yyyy'')
-				between '''||v_advancestartdate||'''  and '''||v_advanceenddate||'''	 
-				and mprmonth=4 and mpryear='||v_year1||'
-				 )
-			)
-	 and coalesce(is_rejected,''0'')=''0''
-	) 
-	 
--------------------------------------------------------	  
-		  union all
-	(select m.mprmonth, m.mpryear,  m.emp_code,trim(regexp_split_to_table(m.batchid,'''','''')) 
-	 from tbl_monthlysalary m where 
-	 ';
-	if p_criteria='Employee' then	  
-		v_querytext:=v_querytext||' 	 
-		 (m.emp_code='||p_emp_code||' or m.emp_code in (select emp_code from openappointments where coalesce(nullif(trim(pancard),''''),''-6666'')='''||coalesce(v_pancard,'-7777')||''')) and ';
-	end if;
-	v_querytext:=v_querytext||' coalesce(m.is_rejected,''0'')=''0''
-	and (
-			to_date(left(m.hrgeneratedon,11),''dd Mon yyyy'')
-				between '''||v_startdate||'''  and '''||v_enddate||'''	 
-			or
-				(
-				to_date(left(m.hrgeneratedon,11),''dd Mon yyyy'')
-				between '''||v_advancestartdate||'''  and '''||v_advanceenddate||'''		 
-				and m.mprmonth=4 and m.mpryear='||v_year1||'
-				 )
-			))
-		  )
-	 )tbl_monthlysalary
-group by emp_code
-) tblcurrenttax
-inner join openappointments op2 on 	tblcurrenttax.emp_code=op2.emp_code
-group by coalesce(nullif(trim(op2.pancard),''''),op2.emp_code::text) 	
-	)tblcurrenttax
-on  coalesce(nullif(trim(openappointments.pancard),''''),openappointments.emp_code::text)=tblcurrenttax.taxpancard
------------------change 1.17 ends------------------------------------------
-	/**************Change 1.15************************************************/
-	left join(select ee_empid,coalesce(ee_termination_date,ee_actualrelievingdate) ee_relieveingdate, ee_finalduesclearancedate::date ee_finalduesclearancedate 
-	from public.employee_exit where employee_exit.isactive=''1'' 
-	)ee
-	on openappointments.emp_id=ee.ee_empid
-	/***********change 1.15 ends***************************************************/
-	 ';
-
-	if p_criteria='Order' then
-		v_querytext:=v_querytext||' where cmsdownloadedwages.contractno='''||p_ordernumber||''' ';
-	end if;
-	if p_criteria='Employee' then
-		v_querytext:=v_querytext||'  where cmsdownloadedwages.empcode='''||p_emp_code||''' ';
-	end if;
-	if p_criteria='Batch' then
-		v_querytext:=v_querytext||' where cmsdownloadedwages.batch_no='''||p_batch_no||''' ';
+						or (to_date(left(hrgeneratedon,11),''dd Mon yyyy'') between '''||v_advancestartdate::date||''' and '''||v_advancesalenddate::date||''' and attendancemode=''Ledger'')	  
+					)
+					then tds else 0 end) as currentmonthtaxdeducted
+				from (
+					/* Regular Monthly Salaries */
+					select emp_code, tds, grossearning, voucher_amount, otherdeductions, hrgeneratedon, is_rejected, mprmonth, mpryear, attendancemode
+					from tbl_monthlysalary
+					where ';
+					
+	if p_criteria = 'Employee' then	  
+		v_querytext := v_querytext || ' 	 
+						(tbl_monthlysalary.emp_code='||p_emp_code||' or tbl_monthlysalary.emp_code in (select emp_code from openappointments where coalesce(nullif(trim(pancard),''''),''-6666'')='''||coalesce(v_pancard,'-7777')||''')) and ';
 	end if;
 	
-  v_querytext:=v_querytext||' ) tmp';
+	v_querytext := v_querytext || ' 
+						(( (
+							to_date(left(tbl_monthlysalary.hrgeneratedon,11),''dd Mon yyyy'') between '''||v_startdate::date||''' and '''||v_enddate::date||'''	 
+							or
+							(
+								to_date(left(tbl_monthlysalary.hrgeneratedon,11),''dd Mon yyyy'') between '''||v_advancestartdate::date ||''' and '''||v_advanceenddate::date||'''		 
+								and mprmonth=4 and mpryear='||v_year1||'
+							)
+						)
+						and attendancemode<>''Ledger''
+						)
+						or (to_date(left(tbl_monthlysalary.hrgeneratedon,11),''dd Mon yyyy'') between '''||v_advancestartdate::date ||''' and '''||v_advanceenddate::date||''' and attendancemode=''Ledger'')	  
+					)
+					and not(mprmonth=4 and mpryear='||v_year2||')
+					and coalesce(is_rejected,''0'')<>''1''
+					
+					union all
+					
+					/* Liability Salaries */
+					select emp_code, tds, grossearning, voucher_amount, otherdeductions, hrgeneratedon, is_rejected, mprmonth, mpryear, attendancemode
+					from tbl_monthly_liability_salary
+					where ';
+					
+	if p_criteria = 'Employee' then	  
+		v_querytext := v_querytext || ' 	 
+						(tbl_monthly_liability_salary.emp_code='||p_emp_code||' or tbl_monthly_liability_salary.emp_code in (select emp_code from openappointments where coalesce(nullif(trim(pancard),''''),''-6666'')='''||coalesce(v_pancard,'-7777')||''')) and ';
+	end if;
+	
+	v_querytext := v_querytext || '  
+						coalesce(salary_remarks,'''') <> ''Invalid Paid Days''
+						and coalesce(is_rejected,''0'') = ''0''
+						and (emp_code, mprmonth, mpryear, batchid) not in (select '||p_emp_code||','||p_mprmonth||', '||p_mpryear||', '''||p_batch_no||''') 	
+						and (emp_code, mprmonth, mpryear, batchid||transactionid) not in (select '||p_emp_code||','||p_mprmonth||', '||p_mpryear||', '''||p_batch_no||''') 		  
+						and not(mprmonth=4 and mpryear='||v_year2||')
+						and (
+							to_date(left(tbl_monthly_liability_salary.hrgeneratedon,11),''dd Mon yyyy'') between '''||v_startdate::date||''' and '''||v_enddate::date||'''	 
+							or
+							(
+								to_date(left(tbl_monthly_liability_salary.hrgeneratedon,11),''dd Mon yyyy'') between '''||v_advancestartdate::date||''' and '''||v_advanceenddate::date||'''		 
+								and mprmonth=4 and mpryear='||v_year1||'
+							)
+						)
+						and (emp_code, mprmonth, mpryear, batchid) not in (
+							select emp_code, mprmonth, mpryear, batchid 
+							from tbl_monthlysalary 
+							where ';
+							
+	if p_criteria = 'Employee' then	  
+		v_querytext := v_querytext || ' 	 
+								(tbl_monthlysalary.emp_code='||p_emp_code||' or tbl_monthlysalary.emp_code in (select emp_code from openappointments where coalesce(nullif(trim(pancard),''''),''-6666'')='''||coalesce(v_pancard,'-7777')||''')) and ';
+	end if;
+	
+	v_querytext := v_querytext || ' 
+								(
+									to_date(left(tbl_monthlysalary.hrgeneratedon,11),''dd Mon yyyy'') between '''||v_startdate::date||''' and '''||v_enddate::date||'''	 
+									or
+									(
+										to_date(left(tbl_monthlysalary.hrgeneratedon,11),''dd Mon yyyy'') between '''||v_advancestartdate::date||''' and '''||v_advanceenddate::date||'''		 
+										and mprmonth=4 and mpryear='||v_year1||'
+									)
+								)
+								and coalesce(is_rejected,''0'')=''0''
+						)
+					union all
+					(
+						select emp_code, mprmonth, mpryear, batchid || coalesce(transactionid::text,'''')
+						from tbl_monthlysalary 
+						where  ';
+						
+	if p_criteria = 'Employee' then	  
+		v_querytext := v_querytext || ' 	 
+							(tbl_monthlysalary.emp_code='||p_emp_code||' or tbl_monthlysalary.emp_code in (select emp_code from openappointments where coalesce(nullif(trim(pancard),''''),''-6666'')='''||coalesce(v_pancard,'-7777')||''')) and ';
+	end if;
+	
+	v_querytext := v_querytext || '
+							(
+								to_date(left(tbl_monthlysalary.hrgeneratedon,11),''dd Mon yyyy'') between '''||v_startdate::date||''' and '''||v_enddate||'''	 
+								or
+								(
+									to_date(left(tbl_monthlysalary.hrgeneratedon,11),''dd Mon yyyy'') between '''||v_advancestartdate||''' and '''||v_advanceenddate||'''	 
+									and mprmonth=4 and mpryear='||v_year1||'
+								)
+							)
+							and coalesce(is_rejected,''0'')=''0''
+					) 
+					union all
+					(
+						select m.mprmonth, m.mpryear, m.emp_code, trim(regexp_split_to_table(m.batchid,'''','''')) 
+						from tbl_monthlysalary m 
+						where ';
+						
+	if p_criteria = 'Employee' then	  
+		v_querytext := v_querytext || ' 	 
+							(m.emp_code='||p_emp_code||' or m.emp_code in (select emp_code from openappointments where coalesce(nullif(trim(pancard),''''),''-6666'')='''||coalesce(v_pancard,'-7777')||''')) and ';
+	end if;
+	
+	v_querytext := v_querytext || ' 
+							coalesce(m.is_rejected,''0'')=''0''
+							and (
+								to_date(left(m.hrgeneratedon,11),''dd Mon yyyy'') between '''||v_startdate||''' and '''||v_enddate||'''	 
+								or
+								(
+									to_date(left(m.hrgeneratedon,11),''dd Mon yyyy'') between '''||v_advancestartdate||''' and '''||v_advanceenddate||'''		 
+									and m.mprmonth=4 and m.mpryear='||v_year1||'
+								)
+							)
+					)
+				) tbl_monthlysalary
+				group by emp_code
+			) tblcurrenttax
+			inner join openappointments op2 on tblcurrenttax.emp_code = op2.emp_code
+			group by coalesce(nullif(trim(op2.pancard),''''), op2.emp_code::text) 	
+		) tblcurrenttax on coalesce(nullif(trim(openappointments.pancard),''''), openappointments.emp_code::text) = tblcurrenttax.taxpancard
+
+	/* =================================================================================================
+	-- 15.p. EMPLOYEE EXIT DETAILS
+	-- Resolves relieving date and final dues clearance checks.
+	-- ================================================================================================= */
+		left join (
+			select ee_empid, coalesce(ee_termination_date, ee_actualrelievingdate) as ee_relieveingdate, ee_finalduesclearancedate::date as ee_finalduesclearancedate 
+			from public.employee_exit 
+			where employee_exit.isactive=''1'' 
+		) ee on openappointments.emp_id = ee.ee_empid
+	';
+
+	/* =================================================================================================
+	-- 16. FINAL FILTERING CLAUSES
+	-- Adding core filters for Criteria Type (Order, Employee, or Batch).
+	-- ================================================================================================= */
+	if p_criteria = 'Order' then
+		v_querytext := v_querytext || ' where cmsdownloadedwages.contractno='''||p_ordernumber||''' ';
+	end if;
+	
+	if p_criteria = 'Employee' then
+		v_querytext := v_querytext || ' where cmsdownloadedwages.empcode='''||p_emp_code||''' ';
+	end if;
+	
+	if p_criteria = 'Batch' then
+		v_querytext := v_querytext || ' where cmsdownloadedwages.batch_no='''||p_batch_no||''' ';
+	end if;
+	
+	v_querytext := v_querytext || ' ) tmp';
 -----To print dynamic Query(Open when debuggig Needed)----------------------				 
 	--raise notice 'Query: % ', v_querytext;	
 -----To print dynamic Query----------------------	
@@ -1619,77 +1660,132 @@ if p_action='Retrieve_Salary' and p_process_status='NotProcessed' then
 
  
 		--open sal for select * from (
-		insert into paymentadvice 
-		(fnfarrivalstatus, mprmonth, mpryear, is_paused, emp_id, mon, dateofjoining, esinumber, posting_department, projectname, contractno, contractcategory, contracttype, activeinbatch, appointment_status_id, remark, lockstatus, is_account_verified, isesiexceptionalcase, esicexceptionmessage, emp_code, subunit, dateofleaving, totalleavetaken, emp_name, post_offered, emp_address, email, mobilenum, pancard, gender, dateofbirth, fathername, residential_address, pfnumber, uannumber, lossofpay, paiddays, monthdays, ratebasic, ratehra, rateconv, ratemedical, ratespecialallowance, fixedallowancestotalrate, basic, hra, conv, medical, specialallowance, fixedallowancestotal, ratebasic_arr, ratehra_arr, rateconv_arr, ratemedical_arr, ratespecialallowance_arr, fixedallowancestotalrate_arr, incentive, refund, grossearning, epf, vpf, employeeesirate, tds, loan, lwf, insurance, mobile, advance, other, grossdeduction, netpay, ac_1, ac_10, ac_2, ac21, employeresirate, lwfcontr, ews, gratuity, recordtype, govt_bonus_opted, govt_bonus_amt, is_special_category, ct2, batch_no, actual_paid_ctc2, ctc, ctc_paid_days, ctc_actual_paid, mobile_deduction, salaryid, employeenpsrate, employernpsrate, insuranceamount, familyinsuranceamount, bankaccountno, ifsccode, bankname, bankbranch, netarear, arearaddedmonths, employee_esi_incentive_deduction, employer_esi_incentive_deduction, total_esi_incentive_deduction, salaryindaysopted, salarydays, otherledgerarear, otherledgerdeductions, attendancemode, incrementarear, incrementarear_basic, incrementarear_hra, incrementarear_allowance, incrementarear_gross, incrementarear_employeeesi, incrementarear_employeresi, lwf_employee, lwf_employer, bonus, otherledgerarearwithoutesi, otherdeductions, othervariables, otherdeductionswithesi, lwfstatecode, tdsadjustment, atds, hrgeneratedon, disbursedledgerids, security_amt, issalaryorliability, professionaltax, customtaxablecomponents, customnontaxablecomponents, ratesalarybonus, ratecommission, ratetransport_allowance, ratetravelling_allowance, rateleave_encashment, rateovertime_allowance, ratenotice_pay, ratehold_salary_non_taxable, ratechildren_education_allowance, rategratuityinhand, salarybonus, commission, transport_allowance, travelling_allowance, leave_encashment, overtime_allowance, notice_pay, hold_salary_non_taxable, children_education_allowance, gratuityinhand, customeraccountid, orgempcode, tpcode, tea_allowance,pfapplicablecomponents,esiapplicablecomponents,isgroupinsurance,employerinsuranceamount,incentivepaiddays,charity_contribution_amount,mealvoucher,verificationstatus, hasarrear, rejectstatus, processedon, paiddaysstatus, pfpaystatus, attendanceid, jobtype,multipayoutrequestid)
-	     select *,p_multipayoutrequestid from (
-		select tmp_sal_pregenerate.*,case when m.emp_code is null then 'Not Verified'		
-		when coalesce(m.is_rejected,'0')='1' then 'Rejected'
-		when m.emp_code is not null then 'Verified'
-		--when m2.empcode is not null then 'Processed'
-		end verificationstatus
-		,case when tblhasarear.empcode is null then 'No Arear' else 'Has Arear' end as hasarrear
-		,case when m.is_rejected='1' then 'Rejected' else 'Not Rejected' end as rejectstatus
-		,to_char(m.createdon,'dd-Mon-yyyy') processedon
-		,case when (invpddays_empcode is null and tms3.invpddays_empcode2 is null) or v_empsalaryregister.flexiblemonthdays='Y' then 'Valid' else 'Invalid' end as paiddaysstatus
-		,case when epfecr_empcode is not null then 'EPFPaid' else 'EPFNotPaid' end as pfpaystatus
-		,null::bigint,v_openappointments.jobtype
+	/* =================================================================================================
+	-- 17. FINAL PAYMENT ADVICE GENERATION
+	-- If processing is standard ('NotProcessed' state), the final generated salary components from the 
+	-- temporary table are verified, stamped with status flags, and inserted into the system's `paymentadvice` log.
+	-- ================================================================================================= */
+	
+	/* Clear any pre-existing unverified entries for this batch */
+	delete from paymentadvice 
+	where emp_code = p_emp_code 
+		and mprmonth = p_mprmonth 
+		and mpryear = p_mpryear 
+		and coalesce(v_cmsdownloadedwages.attendancemode,'') not in ('Manual','Ledger') 
+		and attendancemode <> 'Ledger' 
+		and p_multipayoutrequestid = 0;
+
+	insert into paymentadvice (
+		fnfarrivalstatus, mprmonth, mpryear, is_paused, emp_id, mon, dateofjoining, esinumber, 
+		posting_department, projectname, contractno, contractcategory, contracttype, activeinbatch, 
+		appointment_status_id, remark, lockstatus, is_account_verified, isesiexceptionalcase, 
+		esicexceptionmessage, emp_code, subunit, dateofleaving, totalleavetaken, emp_name, 
+		post_offered, emp_address, email, mobilenum, pancard, gender, dateofbirth, fathername, 
+		residential_address, pfnumber, uannumber, lossofpay, paiddays, monthdays, ratebasic, 
+		ratehra, rateconv, ratemedical, ratespecialallowance, fixedallowancestotalrate, basic, 
+		hra, conv, medical, specialallowance, fixedallowancestotal, ratebasic_arr, ratehra_arr, 
+		rateconv_arr, ratemedical_arr, ratespecialallowance_arr, fixedallowancestotalrate_arr, 
+		incentive, refund, grossearning, epf, vpf, employeeesirate, tds, loan, lwf, insurance, 
+		mobile, advance, other, grossdeduction, netpay, ac_1, ac_10, ac_2, ac21, employeresirate, 
+		lwfcontr, ews, gratuity, recordtype, govt_bonus_opted, govt_bonus_amt, is_special_category, 
+		ct2, batch_no, actual_paid_ctc2, ctc, ctc_paid_days, ctc_actual_paid, mobile_deduction, 
+		salaryid, employeenpsrate, employernpsrate, insuranceamount, familyinsuranceamount, 
+		bankaccountno, ifsccode, bankname, bankbranch, netarear, arearaddedmonths, 
+		employee_esi_incentive_deduction, employer_esi_incentive_deduction, total_esi_incentive_deduction, 
+		salaryindaysopted, salarydays, otherledgerarear, otherledgerdeductions, attendancemode, 
+		incrementarear, incrementarear_basic, incrementarear_hra, incrementarear_allowance, 
+		incrementarear_gross, incrementarear_employeeesi, incrementarear_employeresi, lwf_employee, 
+		lwf_employer, bonus, otherledgerarearwithoutesi, otherdeductions, othervariables, 
+		otherdeductionswithesi, lwfstatecode, tdsadjustment, atds, hrgeneratedon, disbursedledgerids, 
+		security_amt, issalaryorliability, professionaltax, customtaxablecomponents, customnontaxablecomponents, 
+		ratesalarybonus, ratecommission, ratetransport_allowance, ratetravelling_allowance, 
+		rateleave_encashment, rateovertime_allowance, ratenotice_pay, ratehold_salary_non_taxable, 
+		ratechildren_education_allowance, rategratuityinhand, salarybonus, commission, 
+		transport_allowance, travelling_allowance, leave_encashment, overtime_allowance, 
+		notice_pay, hold_salary_non_taxable, children_education_allowance, gratuityinhand, 
+		customeraccountid, orgempcode, tpcode, tea_allowance, pfapplicablecomponents, 
+		esiapplicablecomponents, isgroupinsurance, employerinsuranceamount, incentivepaiddays, 
+		charity_contribution_amount, mealvoucher, verificationstatus, hasarrear, rejectstatus, 
+		processedon, paiddaysstatus, pfpaystatus, attendanceid, jobtype, multipayoutrequestid
+	)
+	select *, p_multipayoutrequestid 
+	from (
+		select tmp_sal_pregenerate.*
+			, case 
+				when m.emp_code is null then 'Not Verified'		
+				when coalesce(m.is_rejected,'0') = '1' then 'Rejected'
+				when m.emp_code is not null then 'Verified'
+			  end as verificationstatus
+			, case when tblhasarear.empcode is null then 'No Arear' else 'Has Arear' end as hasarrear
+			, case when m.is_rejected='1' then 'Rejected' else 'Not Rejected' end as rejectstatus
+			, to_char(m.createdon,'dd-Mon-yyyy') as processedon
+			, case 
+				when (invpddays_empcode is null and tms3.invpddays_empcode2 is null) or v_empsalaryregister.flexiblemonthdays='Y' then 'Valid' 
+				else 'Invalid' 
+			  end as paiddaysstatus
+			, case when epfecr_empcode is not null then 'EPFPaid' else 'EPFNotPaid' end as pfpaystatus
+			, null::bigint
+			, v_openappointments.jobtype
 		from tmp_sal_pregenerate
-			left join tbl_monthlysalary m 
-		on tmp_sal_pregenerate.emp_code=m.emp_code
-		and tmp_sal_pregenerate.mpryear=m.mpryear
-		and tmp_sal_pregenerate.mprmonth=m.mprmonth
-		and tmp_sal_pregenerate.batch_no=m.batchid
-		and m.emp_code=p_emp_code 
-		left join (select distinct empcode
-		  from cmsdownloadedwages
-		 where to_date('01'||lpad(cmsdownloadedwages.mprmonth::text,2,'0')||cmsdownloadedwages.mpryear::text,'ddmmyyyy')<=
-		to_date('01'||lpad(p_mprmonth::text,2,'0')||p_mpryear::text,'ddmmyyyy')
-		and coalesce(nullif(trim(cmsdownloadedwages.multi_performerwagesflag),''),'Y')<>'N'
-		and cmsdownloadedwages.empcode::bigint=p_emp_code) tblhasarear
-		on tmp_sal_pregenerate.emp_code=tblhasarear.empcode::bigint
 		
-		left join (select empcode invpddays_empcode,sum(coalesce(totalpaiddays,0)+coalesce(totalleavetaken,0)) invdays
-									 from cmsdownloadedwages
-									 where mprmonth=p_mprmonth
-									 and mpryear=p_mpryear
-									  and isactive='1'
-				                      and coalesce(nullif(trim(cmsdownloadedwages.multi_performerwagesflag),''),'Y')<>'N'
-				   					  and cmsdownloadedwages.empcode::bigint=p_emp_code
-									 group by empcode
-				  having sum(coalesce(totalpaiddays,0)+coalesce(totalleavetaken,0))>v_monthdays or  v_empsalaryregister.flexiblemonthdays='Y') m4
-				  on tmp_sal_pregenerate.emp_code=m4.invpddays_empcode::bigint
-				/***********************************************/
-					left join (select tms2.emp_code invpddays_empcode2,sum(coalesce(tms2.paiddays,0)) invdays2
-									 from 
-							   (select emp_code,paiddays from tmp_sal_pregenerate
-							   union all
-							   select emp_code,paiddays from tbl_monthlysalary 
-								where emp_code in (select emp_code from tmp_sal_pregenerate) and is_rejected='0' 
-								and recordscreen not in ('Increment Arear')
-								and mprmonth=p_mprmonth
-								and mpryear=p_mpryear
-								and tbl_monthlysalary.emp_code=p_emp_code
-							   ) tms2
-									 group by tms2.emp_code
-				  having sum(coalesce(tms2.paiddays,0))>v_monthdays) tms3
-				  on tmp_sal_pregenerate.emp_code=tms3.invpddays_empcode2::bigint
-				/***********************************************/			
-			--and tmp_sal_pregenerate.monthdays<m4.invdays
-			left join (select distinct unprocessed_epfecrreport.emp_code epfecr_empcode
-									   ,unprocessed_epfecrreport.rpt_year
-									   ,unprocessed_epfecrreport.rpt_month
-									   ,unprocessed_epfecrreport.batchid
-									 from unprocessed_epfecrreport
-									 where rpt_month=p_mprmonth
-									 and rpt_year=p_mpryear
-								and unprocessed_epfecrreport.emp_code=p_emp_code
-					  ) tmpepfecr
-				  on tmp_sal_pregenerate.emp_code=tmpepfecr.epfecr_empcode
-					and tmp_sal_pregenerate.mpryear=tmpepfecr.rpt_year
-					and tmp_sal_pregenerate.mprmonth=tmpepfecr.rpt_month
-					and tmp_sal_pregenerate.batch_no=tmpepfecr.batchid
-   
-			)tmp2;
+		left join tbl_monthlysalary m on tmp_sal_pregenerate.emp_code = m.emp_code
+			and tmp_sal_pregenerate.mpryear = m.mpryear
+			and tmp_sal_pregenerate.mprmonth = m.mprmonth
+			and tmp_sal_pregenerate.batch_no = m.batchid
+			and m.emp_code = p_emp_code 
+			
+		left join (
+			select distinct empcode
+			from cmsdownloadedwages
+			where to_date('01'||lpad(cmsdownloadedwages.mprmonth::text,2,'0')||cmsdownloadedwages.mpryear::text,'ddmmyyyy') <= to_date('01'||lpad(p_mprmonth::text,2,'0')||p_mpryear::text,'ddmmyyyy')
+				and coalesce(nullif(trim(cmsdownloadedwages.multi_performerwagesflag),''),'Y') <> 'N'
+				and cmsdownloadedwages.empcode::bigint = p_emp_code
+		) tblhasarear on tmp_sal_pregenerate.emp_code = tblhasarear.empcode::bigint
+		
+		left join (
+			select empcode as invpddays_empcode, sum(coalesce(totalpaiddays,0) + coalesce(totalleavetaken,0)) as invdays
+			from cmsdownloadedwages
+			where mprmonth = p_mprmonth
+				and mpryear = p_mpryear
+				and isactive = '1'
+				and coalesce(nullif(trim(cmsdownloadedwages.multi_performerwagesflag),''),'Y') <> 'N'
+				and cmsdownloadedwages.empcode::bigint = p_emp_code
+			group by empcode
+			having sum(coalesce(totalpaiddays,0) + coalesce(totalleavetaken,0)) > v_monthdays 
+				or v_empsalaryregister.flexiblemonthdays = 'Y'
+		) m4 on tmp_sal_pregenerate.emp_code = m4.invpddays_empcode::bigint
+		
+		left join (
+			select tms2.emp_code as invpddays_empcode2, sum(coalesce(tms2.paiddays,0)) as invdays2
+			from (
+				select emp_code, paiddays from tmp_sal_pregenerate
+				union all
+				select emp_code, paiddays from tbl_monthlysalary 
+				where emp_code in (select emp_code from tmp_sal_pregenerate) 
+					and is_rejected = '0' 
+					and recordscreen not in ('Increment Arear')
+					and mprmonth = p_mprmonth
+					and mpryear = p_mpryear
+					and tbl_monthlysalary.emp_code = p_emp_code
+			) tms2
+			group by tms2.emp_code
+			having sum(coalesce(tms2.paiddays,0)) > v_monthdays
+		) tms3 on tmp_sal_pregenerate.emp_code = tms3.invpddays_empcode2::bigint
+		
+		left join (
+			select distinct unprocessed_epfecrreport.emp_code as epfecr_empcode
+				, unprocessed_epfecrreport.rpt_year
+				, unprocessed_epfecrreport.rpt_month
+				, unprocessed_epfecrreport.batchid
+			from unprocessed_epfecrreport
+			where rpt_month = p_mprmonth
+				and rpt_year = p_mpryear
+				and unprocessed_epfecrreport.emp_code = p_emp_code
+		) tmpepfecr on tmp_sal_pregenerate.emp_code = tmpepfecr.epfecr_empcode
+			and tmp_sal_pregenerate.mpryear = tmpepfecr.rpt_year
+			and tmp_sal_pregenerate.mprmonth = tmpepfecr.rpt_month
+			and tmp_sal_pregenerate.batch_no = tmpepfecr.batchid
+	) tmp2;
 								  
 
 													   
@@ -1708,246 +1804,280 @@ if p_action='Retrieve_Salary' and p_process_status='NotProcessed' then
 	open sal for select * from paymentadvice where emp_code=p_emp_code and mprmonth=p_mprmonth and mpryear=p_mpryear and multipayoutrequestid=p_multipayoutrequestid order by COALESCE(attendancemode ,'MPR') desc limit 1; 
 			return sal;
 end if;	
-/***********************Change 1.21 Starts here*************************************************/
-if (coalesce(nullif(p_process_status,''),'NotProcessed') in ('Processed','NotProcessed') and  p_action='GetProcessedSalaries')  then
- 			open sal for 
-			with tblmain as(
-			SELECT 'NoFNFLock' fnfarrivalstatus/* column added for change 1.15*/,tbl_monthlysalary.mprmonth, tbl_monthlysalary.mpryear,MTempPausedSalary.is_paused ,
-  openappointments.emp_id,TO_CHAR(TO_TIMESTAMP (p_mprmonth::text, 'MM'), 'Mon')||'-'||p_mpryear::text AS Mon,
- to_char(dateofjoining,'dd/mm/yyyy') dateofjoining,esinumber,posting_department,'' projectname,
-								cm.contractno contractno,
-								'' contractcategory,
-								'' contracttype,'Active' as activeinbatch,appointment_status_id,'' remark,'Unlocked' lockstatus,
-coalesce(is_account_verified,'0')::bit is_account_verified,
-null isesiexceptionalcase,
-null esicexceptionmessage,
- openappointments.emp_code, subunit, to_char(dateofleaving,'dd-Mon-yyyy') dateofleaving, totalleavetaken,openappointments.emp_name,openappointments.post_offered,openappointments.emp_address,openappointments.email,
- mobilenum, openappointments.pancard, openappointments.gender, to_char(openappointments.dateofbirth,'dd/mm/yyyy') dateofbirth, openappointments.fathername,openappointments. residential_address, openappointments.pfnumber, openappointments.uannumber, 
- lossofpay, paiddays, monthdays, ratebasic, ratehra, rateconv, ratemedical, ratespecialallowance, 
- fixedallowancestotalrate, basic, hra, conv, medical, specialallowance, fixedallowancestotal,
- ratebasic_arr, ratehra_arr, rateconv_arr, ratemedical_arr, ratespecialallowance_arr, fixedallowancestotalrate_arr, 
- incentive, refund, grossearning, epf, vpf, employeeesirate, tds, loan, lwf, insurance,tbl_monthlysalary. mobile, advance,
- other, grossdeduction, netpay, ac_1, ac_10, ac_2, ac21, employeresirate, lwfcontr, ews, gratuity, recordtype, tbl_monthlysalary.govt_bonus_opted, govt_bonus_amt,
-  is_special_category, ctc2 ct2, batch_no,  actual_paid_ctc2, ctc, ctc_paid_days, ctc_actual_paid, mobile_deduction, salaryid, 
- employeenps, employernps, insuranceamount, familyinsurance, tbl_monthlysalary.bankaccountno, tbl_monthlysalary.ifsccode, tbl_monthlysalary.bankname, tbl_monthlysalary.bankbranch,
- totalarear netarear,arearaddedmonths, employee_esi_incentive_deduction,employer_esi_incentive_deduction,
- total_esi_incentive_deduction,salaryindaysopted,mastersalarydays salarydays,otherledgerarears otherledgerarear,otherledgerdeductions,
- attendancemode,incrementarear,
- incrementarear_basic,incrementarear_hra,incrementarear_allowance,incrementarear_gross,incrementarear_employeeesi,incrementarear_employeresi,
- lwf_employee,lwf_employer,bonus,otherledgerarearwithoutesi,otherdeductions,othervariables,otherbonuswithesi otherdeductionswithesi,tbl_monthlysalary.lwfstatecode,tbl_monthlysalary.tdsadjustment,atds,hrgeneratedon,'' disbursedledgerids,security_amt,issalaryorliability,professionaltax,case when issalaryorliability='L' then 'Not Verified' else 'Verified' end verificationstatus,'' hasarear,case when is_rejected='1' then 'Rejected' else 'Not Rejected' end as rejectstatus,to_char(tbl_monthlysalary.createdon,'dd-Mon-yyyy') processedon,'Valid' paiddaysstatus
-,case when epfecr_empcode is not null or issalaryorliability='L' then 'EPFPaid' else 'EPFNotPaid' end as pfpaystatus
-,disbursementmode
-	FROM public.tbl_monthlysalary inner join openappointments 
-	on tbl_monthlysalary.emp_code=openappointments.emp_code
-	and openappointments.appointment_status_id<>13 
-	and coalesce(tbl_monthlysalary.is_rejected,'0')<>'1'
-	and (tbl_monthlysalary.isarear<>'Y' or tbl_monthlysalary.recordscreen='Previous Wages')
-
-	and issalaryorliability=case when (p_action='Retrieve_Salary' and coalesce(nullif(p_process_status,''),'NotProcessed')='Processed') or  (p_action='GetProcessedSalaries' and coalesce(nullif(p_process_status,''),'NotProcessed')='NotProcessed') then 'L' when (p_action='GetProcessedSalaries' and coalesce(nullif(p_process_status,''),'NotProcessed')='Processed') then 'S' end
-	-----------Processed record searech criteria-------------------
-	and tbl_monthlysalary.emp_code= case when p_criteria='Employee' then
-		p_emp_code else tbl_monthlysalary.emp_code end
-	left join (select empcode,mprmonth,mpryear,batch_no batchn,
-			   string_agg(contractno,',') contractno
-			   from cmsdownloadedwages cm 
-			   where cm.mprmonth=p_mprmonth
-			  and cm.mpryear=p_mpryear
-			  and cm.isactive='1'
-			   and cm.contractno= case when p_criteria='Order' then
-		 		p_ordernumber else cm.contractno end
-			   group by empcode,mprmonth,mpryear,batch_no
-			  ) cm
-			   on 	tbl_monthlysalary.emp_code=cm.empcode::bigint
-		and tbl_monthlysalary.batchid=cm.batchn							   
-		-----------Processed record searech criteria ends------------------- 
-		 
-	left join (select empid,pausedstatus  is_paused  
+	/* =================================================================================================
+	-- 18. RETRIEVE PROCESSED/UNPROCESSED SALARIES (GET PROCESSED SALARIES)
+	-- Handles the retrieval of salaries that are fully processed or not processed.
+	-- Joins with historical processed tables (`tbl_monthlysalary`), active tracking logs, and pauses.
+	-- ================================================================================================= */
+	if (coalesce(nullif(p_process_status,''),'NotProcessed') in ('Processed','NotProcessed') and p_action='GetProcessedSalaries') then
+		open sal for 
+		with tblmain as (
+			select 
+				'NoFNFLock' as fnfarrivalstatus /* column added for change 1.15 */, 
+				tbl_monthlysalary.mprmonth, 
+				tbl_monthlysalary.mpryear, 
+				MTempPausedSalary.is_paused, 
+				openappointments.emp_id, 
+				to_char(to_timestamp(p_mprmonth::text, 'MM'), 'Mon') || '-' || p_mpryear::text as Mon,
+				to_char(dateofjoining, 'dd/mm/yyyy') as dateofjoining, esinumber, posting_department, '' as projectname,
+				cm.contractno as contractno, '' as contractcategory, '' as contracttype, 'Active' as activeinbatch, 
+				appointment_status_id, '' as remark, 'Unlocked' as lockstatus,
+				coalesce(is_account_verified, '0')::bit as is_account_verified,
+				null as isesiexceptionalcase, null as esicexceptionmessage,
+				openappointments.emp_code, subunit, to_char(dateofleaving, 'dd-Mon-yyyy') as dateofleaving, totalleavetaken, 
+				openappointments.emp_name, openappointments.post_offered, openappointments.emp_address, openappointments.email,
+				mobilenum, openappointments.pancard, openappointments.gender, to_char(openappointments.dateofbirth, 'dd/mm/yyyy') as dateofbirth, 
+				openappointments.fathername, openappointments.residential_address, openappointments.pfnumber, openappointments.uannumber, 
+				lossofpay, paiddays, monthdays, ratebasic, ratehra, rateconv, ratemedical, ratespecialallowance, 
+				fixedallowancestotalrate, basic, hra, conv, medical, specialallowance, fixedallowancestotal,
+				ratebasic_arr, ratehra_arr, rateconv_arr, ratemedical_arr, ratespecialallowance_arr, fixedallowancestotalrate_arr, 
+				incentive, refund, grossearning, epf, vpf, employeeesirate, tds, loan, lwf, insurance, tbl_monthlysalary.mobile, advance,
+				other, grossdeduction, netpay, ac_1, ac_10, ac_2, ac21, employeresirate, lwfcontr, ews, gratuity, recordtype, 
+				tbl_monthlysalary.govt_bonus_opted, govt_bonus_amt, is_special_category, ctc2 as ct2, batch_no, actual_paid_ctc2, 
+				ctc, ctc_paid_days, ctc_actual_paid, mobile_deduction, salaryid, employeenps, employernps, insuranceamount, 
+				familyinsurance, tbl_monthlysalary.bankaccountno, tbl_monthlysalary.ifsccode, tbl_monthlysalary.bankname, tbl_monthlysalary.bankbranch,
+				totalarear as netarear, arearaddedmonths, employee_esi_incentive_deduction, employer_esi_incentive_deduction,
+				total_esi_incentive_deduction, salaryindaysopted, mastersalarydays as salarydays, otherledgerarears as otherledgerarear, 
+				otherledgerdeductions, attendancemode, incrementarear, incrementarear_basic, incrementarear_hra, incrementarear_allowance, 
+				incrementarear_gross, incrementarear_employeeesi, incrementarear_employeresi, lwf_employee, lwf_employer, bonus, 
+				otherledgerarearwithoutesi, otherdeductions, othervariables, otherbonuswithesi as otherdeductionswithesi, 
+				tbl_monthlysalary.lwfstatecode, tbl_monthlysalary.tdsadjustment, atds, hrgeneratedon, '' as disbursedledgerids, 
+				security_amt, issalaryorliability, professionaltax, 
+				case when issalaryorliability='L' then 'Not Verified' else 'Verified' end as verificationstatus, 
+				'' as hasarear, 
+				case when is_rejected='1' then 'Rejected' else 'Not Rejected' end as rejectstatus, 
+				to_char(tbl_monthlysalary.createdon, 'dd-Mon-yyyy') as processedon, 'Valid' as paiddaysstatus,
+				case when epfecr_empcode is not null or issalaryorliability='L' then 'EPFPaid' else 'EPFNotPaid' end as pfpaystatus, 
+				disbursementmode
+			from public.tbl_monthlysalary 
+			inner join openappointments on tbl_monthlysalary.emp_code = openappointments.emp_code
+				and openappointments.appointment_status_id <> 13 
+				and coalesce(tbl_monthlysalary.is_rejected, '0') <> '1'
+				and (tbl_monthlysalary.isarear <> 'Y' or tbl_monthlysalary.recordscreen = 'Previous Wages')
+				and issalaryorliability = case 
+					when (p_action='Retrieve_Salary' and coalesce(nullif(p_process_status,''),'NotProcessed')='Processed') or (p_action='GetProcessedSalaries' and coalesce(nullif(p_process_status,''),'NotProcessed')='NotProcessed') then 'L' 
+					when (p_action='GetProcessedSalaries' and coalesce(nullif(p_process_status,''),'NotProcessed')='Processed') then 'S' 
+				end
+			/* Processed record search criteria */
+			and tbl_monthlysalary.emp_code = case when p_criteria='Employee' then p_emp_code else tbl_monthlysalary.emp_code end
+			
+			left join (
+				select empcode, mprmonth, mpryear, batch_no as batchn, string_agg(contractno,',') as contractno
+				from cmsdownloadedwages cm 
+				where cm.mprmonth = p_mprmonth
+					and cm.mpryear = p_mpryear
+					and cm.isactive = '1'
+					and cm.contractno = case when p_criteria='Order' then p_ordernumber else cm.contractno end
+				group by empcode, mprmonth, mpryear, batch_no
+			) cm on tbl_monthlysalary.emp_code = cm.empcode::bigint and tbl_monthlysalary.batchid = cm.batchn							   
+			
+			left join (
+				select empid, pausedstatus as is_paused  
 				from ManageTempPausedSalary
-				WHERE  ManageTempPausedSalary.ProcessYear =p_mpryear
-				and ManageTempPausedSalary.ProcessMonth =p_mprmonth
-				 ) MTempPausedSalary
-				 on openappointments.emp_id=MTempPausedSalary.empid 
-				 			left join (select distinct epfecrreport.emp_code epfecr_empcode
-									   ,epfecrreport.rpt_year
-									   ,epfecrreport.rpt_month
-									   ,epfecrreport.batchid
-									 from epfecrreport
-									 where rpt_month=p_mprmonth
-									 and rpt_year=p_mpryear) tmpepfecr
-				  on tbl_monthlysalary.emp_code=tmpepfecr.epfecr_empcode
-					and tbl_monthlysalary.mpryear=tmpepfecr.rpt_year
-					and tbl_monthlysalary.mprmonth=tmpepfecr.rpt_month
-					and tbl_monthlysalary.batchid=tmpepfecr.batchid												
-				 where tbl_monthlysalary.mprmonth=p_mprmonth
-				 and tbl_monthlysalary.mpryear=p_mpryear
-				and coalesce(cm.contractno,'')= case when p_criteria='Order' then
-		 		p_ordernumber else coalesce(cm.contractno,'') end
-				)
-				select tblmain.*,tblbalance.ledgerbalance from tblmain inner join (select tblbalance.emp_code,sum(tblbalance.netpay) ledgerbalance
-																				   from tblmain as tblbalance group by tblbalance.emp_code) tblbalance
-				on tblmain.emp_code=tblbalance.emp_code
-				order by tblmain.emp_code;
+				where ManageTempPausedSalary.ProcessYear = p_mpryear
+					and ManageTempPausedSalary.ProcessMonth = p_mprmonth
+			) MTempPausedSalary on openappointments.emp_id = MTempPausedSalary.empid 
+			
+			left join (
+				select distinct epfecrreport.emp_code as epfecr_empcode, epfecrreport.rpt_year, epfecrreport.rpt_month, epfecrreport.batchid
+				from epfecrreport
+				where rpt_month = p_mprmonth and rpt_year = p_mpryear
+			) tmpepfecr on tbl_monthlysalary.emp_code = tmpepfecr.epfecr_empcode
+				and tbl_monthlysalary.mpryear = tmpepfecr.rpt_year
+				and tbl_monthlysalary.mprmonth = tmpepfecr.rpt_month
+				and tbl_monthlysalary.batchid = tmpepfecr.batchid												
+			where tbl_monthlysalary.mprmonth = p_mprmonth
+				and tbl_monthlysalary.mpryear = p_mpryear
+				and coalesce(cm.contractno,'') = case when p_criteria='Order' then p_ordernumber else coalesce(cm.contractno,'') end
+		)
+		select tblmain.*, tblbalance.ledgerbalance 
+		from tblmain 
+		inner join (
+			select tblbalance.emp_code, sum(tblbalance.netpay) as ledgerbalance
+			from tblmain as tblbalance 
+			group by tblbalance.emp_code
+		) tblbalance on tblmain.emp_code = tblbalance.emp_code
+		order by tblmain.emp_code;
 			 
-return sal;				 
-end if;
-if (coalesce(nullif(p_process_status,''),'NotProcessed')='PartiallyProcessed' and  p_action='GetProcessedSalaries')  then
- 			open sal for			
-			with tblmain as( 
-			SELECT 'NoFNFLock' fnfarrivalstatus/* column added for change 1.15*/,tbl_monthlysalary.mprmonth, tbl_monthlysalary.mpryear,MTempPausedSalary.is_paused ,
-  openappointments.emp_id,TO_CHAR(TO_TIMESTAMP (p_mprmonth::text, 'MM'), 'Mon')||'-'||p_mpryear::text AS Mon,
- to_char(dateofjoining,'dd/mm/yyyy') dateofjoining,esinumber,posting_department,'' projectname,
-								cm.contractno contractno,
-								'' contractcategory,
-								'' contracttype,'Active' as activeinbatch,appointment_status_id,'' remark,'Unlocked' lockstatus,
-coalesce(is_account_verified,'0')::bit is_account_verified,
-null isesiexceptionalcase,
-null esicexceptionmessage,
- openappointments.emp_code, subunit, to_char(dateofleaving,'dd-Mon-yyyy') dateofleaving, totalleavetaken,openappointments.emp_name,openappointments.post_offered,openappointments.emp_address,openappointments.email,
- mobilenum, openappointments.pancard, openappointments.gender, to_char(openappointments.dateofbirth,'dd/mm/yyyy') dateofbirth, openappointments.fathername,openappointments. residential_address, openappointments.pfnumber, openappointments.uannumber, 
- lossofpay, paiddays, monthdays, ratebasic, ratehra, rateconv, ratemedical, ratespecialallowance, 
- fixedallowancestotalrate, basic, hra, conv, medical, specialallowance, fixedallowancestotal,
- ratebasic_arr, ratehra_arr, rateconv_arr, ratemedical_arr, ratespecialallowance_arr, fixedallowancestotalrate_arr, 
- incentive, refund, grossearning, epf, vpf, employeeesirate, tds, loan, lwf, insurance,tbl_monthlysalary. mobile, advance,
- other, grossdeduction, netpay, ac_1, ac_10, ac_2, ac21, employeresirate, lwfcontr, ews, gratuity, recordtype, tbl_monthlysalary.govt_bonus_opted, govt_bonus_amt,
-  is_special_category, ctc2 ct2, batch_no,  actual_paid_ctc2, ctc, ctc_paid_days, ctc_actual_paid, mobile_deduction, salaryid, 
- employeenps, employernps, insuranceamount, familyinsurance, tbl_monthlysalary.bankaccountno, tbl_monthlysalary.ifsccode, tbl_monthlysalary.bankname, tbl_monthlysalary.bankbranch,
- totalarear netarear,arearaddedmonths, employee_esi_incentive_deduction,employer_esi_incentive_deduction,
- total_esi_incentive_deduction,salaryindaysopted,mastersalarydays salarydays,otherledgerarears otherledgerarear,otherledgerdeductions,
- attendancemode,incrementarear,
- incrementarear_basic,incrementarear_hra,incrementarear_allowance,incrementarear_gross,incrementarear_employeeesi,incrementarear_employeresi,
- lwf_employee,lwf_employer,bonus,otherledgerarearwithoutesi,otherdeductions,othervariables,otherbonuswithesi otherdeductionswithesi,tbl_monthlysalary.lwfstatecode,tbl_monthlysalary.tdsadjustment,atds,hrgeneratedon,'' disbursedledgerids,security_amt,issalaryorliability,professionaltax,case when issalaryorliability='L' then 'Not Verified' else 'Verified' end verificationstatus,'' hasarear,case when is_rejected='1' then 'Rejected' else 'Not Rejected' end as rejectstatus,to_char(tbl_monthlysalary.createdon,'dd-Mon-yyyy') processedon,'Valid' paiddaysstatus
-,case when epfecr_empcode is not null or issalaryorliability='L' then 'EPFPaid' else 'EPFNotPaid' end as pfpaystatus
-,disbursementmode			
-	FROM public.tbl_monthlysalary inner join openappointments 
-	on tbl_monthlysalary.emp_code=openappointments.emp_code
-	and openappointments.appointment_status_id<>13 
-	and coalesce(tbl_monthlysalary.is_rejected,'0')<>'1'
-	and (tbl_monthlysalary.isarear<>'Y' or tbl_monthlysalary.recordscreen='Previous Wages')
-
-	and issalaryorliability= 'L'
-	and tbl_monthlysalary.attendancemode='Ledger'			
-	-----------Processed record searech criteria-------------------
-	and tbl_monthlysalary.emp_code= case when p_criteria='Employee' then
-		p_emp_code else tbl_monthlysalary.emp_code end
-	left join (select empcode,mprmonth,mpryear,batch_no batchn,
-			   string_agg(contractno,',') contractno
-			   from cmsdownloadedwages cm 
-			   where cm.mprmonth=p_mprmonth
-			  and cm.mpryear=p_mpryear
-			  and cm.isactive='1'
-			   and cm.contractno= case when p_criteria='Order' then
-		 		p_ordernumber else cm.contractno end
-			   group by empcode,mprmonth,mpryear,batch_no
-			  ) cm
-			   on 	tbl_monthlysalary.emp_code=cm.empcode::bigint
-		and tbl_monthlysalary.batchid=cm.batchn							   
-		-----------Processed record searech criteria ends------------------- 
-		 
-	left join (select empid,pausedstatus  is_paused  
+		return sal;				 
+	end if;
+	/* =================================================================================================
+	-- 19. RETRIEVE PARTIALLY PROCESSED SALARIES
+	-- Specifically targets the "Ledger" attendance mode to identify partially processed or adjusted historical wages.
+	-- Handles past month processing lookbacks based on 'L' (liability) entries.
+	-- ================================================================================================= */
+	if (coalesce(nullif(p_process_status,''),'NotProcessed') = 'PartiallyProcessed' and p_action = 'GetProcessedSalaries') then
+		open sal for			
+		with tblmain as ( 
+			select 
+				'NoFNFLock' as fnfarrivalstatus /* column added for change 1.15 */, 
+				tbl_monthlysalary.mprmonth, 
+				tbl_monthlysalary.mpryear, 
+				MTempPausedSalary.is_paused, 
+				openappointments.emp_id, 
+				to_char(to_timestamp(p_mprmonth::text, 'MM'), 'Mon') || '-' || p_mpryear::text as Mon,
+				to_char(dateofjoining, 'dd/mm/yyyy') as dateofjoining, esinumber, posting_department, '' as projectname,
+				cm.contractno as contractno, '' as contractcategory, '' as contracttype, 'Active' as activeinbatch, 
+				appointment_status_id, '' as remark, 'Unlocked' as lockstatus,
+				coalesce(is_account_verified, '0')::bit as is_account_verified,
+				null as isesiexceptionalcase, null as esicexceptionmessage,
+				openappointments.emp_code, subunit, to_char(dateofleaving, 'dd-Mon-yyyy') as dateofleaving, totalleavetaken, 
+				openappointments.emp_name, openappointments.post_offered, openappointments.emp_address, openappointments.email,
+				mobilenum, openappointments.pancard, openappointments.gender, to_char(openappointments.dateofbirth, 'dd/mm/yyyy') as dateofbirth, 
+				openappointments.fathername, openappointments.residential_address, openappointments.pfnumber, openappointments.uannumber, 
+				lossofpay, paiddays, monthdays, ratebasic, ratehra, rateconv, ratemedical, ratespecialallowance, 
+				fixedallowancestotalrate, basic, hra, conv, medical, specialallowance, fixedallowancestotal,
+				ratebasic_arr, ratehra_arr, rateconv_arr, ratemedical_arr, ratespecialallowance_arr, fixedallowancestotalrate_arr, 
+				incentive, refund, grossearning, epf, vpf, employeeesirate, tds, loan, lwf, insurance, tbl_monthlysalary.mobile, advance,
+				other, grossdeduction, netpay, ac_1, ac_10, ac_2, ac21, employeresirate, lwfcontr, ews, gratuity, recordtype, 
+				tbl_monthlysalary.govt_bonus_opted, govt_bonus_amt, is_special_category, ctc2 as ct2, batch_no, actual_paid_ctc2, 
+				ctc, ctc_paid_days, ctc_actual_paid, mobile_deduction, salaryid, employeenps, employernps, insuranceamount, 
+				familyinsurance, tbl_monthlysalary.bankaccountno, tbl_monthlysalary.ifsccode, tbl_monthlysalary.bankname, tbl_monthlysalary.bankbranch,
+				totalarear as netarear, arearaddedmonths, employee_esi_incentive_deduction, employer_esi_incentive_deduction,
+				total_esi_incentive_deduction, salaryindaysopted, mastersalarydays as salarydays, otherledgerarears as otherledgerarear, 
+				otherledgerdeductions, attendancemode, incrementarear, incrementarear_basic, incrementarear_hra, incrementarear_allowance, 
+				incrementarear_gross, incrementarear_employeeesi, incrementarear_employeresi, lwf_employee, lwf_employer, bonus, 
+				otherledgerarearwithoutesi, otherdeductions, othervariables, otherbonuswithesi as otherdeductionswithesi, 
+				tbl_monthlysalary.lwfstatecode, tbl_monthlysalary.tdsadjustment, atds, hrgeneratedon, '' as disbursedledgerids, 
+				security_amt, issalaryorliability, professionaltax, 
+				case when issalaryorliability='L' then 'Not Verified' else 'Verified' end as verificationstatus, 
+				'' as hasarear, 
+				case when is_rejected='1' then 'Rejected' else 'Not Rejected' end as rejectstatus, 
+				to_char(tbl_monthlysalary.createdon, 'dd-Mon-yyyy') as processedon, 'Valid' as paiddaysstatus,
+				case when epfecr_empcode is not null or issalaryorliability='L' then 'EPFPaid' else 'EPFNotPaid' end as pfpaystatus, 
+				disbursementmode			
+			from public.tbl_monthlysalary 
+			inner join openappointments on tbl_monthlysalary.emp_code = openappointments.emp_code
+				and openappointments.appointment_status_id <> 13 
+				and coalesce(tbl_monthlysalary.is_rejected, '0') <> '1'
+				and (tbl_monthlysalary.isarear <> 'Y' or tbl_monthlysalary.recordscreen = 'Previous Wages')
+				and issalaryorliability = 'L'
+				and tbl_monthlysalary.attendancemode = 'Ledger'			
+			
+			/* Processed record search criteria */
+			and tbl_monthlysalary.emp_code = case when p_criteria='Employee' then p_emp_code else tbl_monthlysalary.emp_code end
+			
+			left join (
+				select empcode, mprmonth, mpryear, batch_no as batchn, string_agg(contractno,',') as contractno
+				from cmsdownloadedwages cm 
+				where cm.mprmonth = p_mprmonth
+					and cm.mpryear = p_mpryear
+					and cm.isactive = '1'
+					and cm.contractno = case when p_criteria='Order' then p_ordernumber else cm.contractno end
+				group by empcode, mprmonth, mpryear, batch_no
+			) cm on tbl_monthlysalary.emp_code = cm.empcode::bigint and tbl_monthlysalary.batchid = cm.batchn							   
+			
+			left join (
+				select empid, pausedstatus as is_paused  
 				from ManageTempPausedSalary
-				WHERE  ManageTempPausedSalary.ProcessYear =p_mpryear
-				and ManageTempPausedSalary.ProcessMonth =p_mprmonth
-				 ) MTempPausedSalary
-				 on openappointments.emp_id=MTempPausedSalary.empid 
-				 			left join (select distinct epfecrreport.emp_code epfecr_empcode
-									   ,epfecrreport.rpt_year
-									   ,epfecrreport.rpt_month
-									   ,epfecrreport.batchid
-									 from epfecrreport
-									 where rpt_month=p_mprmonth
-									 and rpt_year=p_mpryear) tmpepfecr
-				  on tbl_monthlysalary.emp_code=tmpepfecr.epfecr_empcode
-					and tbl_monthlysalary.mpryear=tmpepfecr.rpt_year
-					and tbl_monthlysalary.mprmonth=tmpepfecr.rpt_month
-					and tbl_monthlysalary.batchid=tmpepfecr.batchid												
-				 where tbl_monthlysalary.is_rejected='0' and
-				 		(
-					 	(tbl_monthlysalary.mprmonth<p_mprmonth	 and tbl_monthlysalary.mpryear=p_mpryear)
-					   	or 
-					 	tbl_monthlysalary.mpryear<p_mpryear
-					   )
-				and coalesce(cm.contractno,'')= case when p_criteria='Order' then
-		 		p_ordernumber else coalesce(cm.contractno,'') end
+				where ManageTempPausedSalary.ProcessYear = p_mpryear
+					and ManageTempPausedSalary.ProcessMonth = p_mprmonth
+			) MTempPausedSalary on openappointments.emp_id = MTempPausedSalary.empid 
+			
+			left join (
+				select distinct epfecrreport.emp_code as epfecr_empcode, epfecrreport.rpt_year, epfecrreport.rpt_month, epfecrreport.batchid
+				from epfecrreport
+				where rpt_month = p_mprmonth and rpt_year = p_mpryear
+			) tmpepfecr on tbl_monthlysalary.emp_code = tmpepfecr.epfecr_empcode
+				and tbl_monthlysalary.mpryear = tmpepfecr.rpt_year
+				and tbl_monthlysalary.mprmonth = tmpepfecr.rpt_month
+				and tbl_monthlysalary.batchid = tmpepfecr.batchid												
+			where tbl_monthlysalary.is_rejected = '0' 
+				and (
+					(tbl_monthlysalary.mprmonth < p_mprmonth and tbl_monthlysalary.mpryear = p_mpryear) 
+					or tbl_monthlysalary.mpryear < p_mpryear
 				)
-				select tblmain.*,tblbalance.ledgerbalance from tblmain inner join (select tblbalance.emp_code,sum(tblbalance.netpay) ledgerbalance
-																				   from tblmain as tblbalance group by tblbalance.emp_code) tblbalance
-				on tblmain.emp_code=tblbalance.emp_code
-				order by tblmain.emp_code;
+				and coalesce(cm.contractno,'') = case when p_criteria='Order' then p_ordernumber else coalesce(cm.contractno,'') end
+		)
+		select tblmain.*, tblbalance.ledgerbalance 
+		from tblmain 
+		inner join (
+			select tblbalance.emp_code, sum(tblbalance.netpay) as ledgerbalance
+			from tblmain as tblbalance 
+			group by tblbalance.emp_code
+		) tblbalance on tblmain.emp_code = tblbalance.emp_code
+		order by tblmain.emp_code;
 			 
-return sal;				 
-end if;
+		return sal;				 
+	end if;
 /*****************Change 1.21 ends here**************************************/
  if (coalesce(nullif(p_process_status,''),'NotProcessed')='Processed' and p_action='Retrieve_Salary') then
  			open sal for 
-			SELECT 'NoFNFLock' fnfarrivalstatus/* column added for change 1.15*/,tbl_monthlysalary.mprmonth, tbl_monthlysalary.mpryear,MTempPausedSalary.is_paused ,
-  openappointments.emp_id,TO_CHAR(TO_TIMESTAMP (p_mprmonth::text, 'MM'), 'Mon')||'-'||p_mpryear::text AS Mon,
- to_char(dateofjoining,'dd/mm/yyyy') dateofjoining,esinumber,posting_department,'' projectname,
-								cm.contractno contractno,
-								'' contractcategory,
-								'' contracttype,'Active' as activeinbatch,appointment_status_id,'' remark,'Unlocked' lockstatus,
-coalesce(is_account_verified,'0')::bit is_account_verified,
-null isesiexceptionalcase,
-null esicexceptionmessage,
- openappointments.emp_code, subunit, to_char(dateofleaving,'dd-Mon-yyyy') dateofleaving, totalleavetaken,openappointments.emp_name,openappointments.post_offered,openappointments.emp_address,openappointments.email,
- mobilenum, openappointments.pancard, openappointments.gender, to_char(openappointments.dateofbirth,'dd/mm/yyyy') dateofbirth, openappointments.fathername,openappointments. residential_address, openappointments.pfnumber, openappointments.uannumber, 
- lossofpay, paiddays, monthdays, ratebasic, ratehra, rateconv, ratemedical, ratespecialallowance, 
- fixedallowancestotalrate, basic, hra, conv, medical, specialallowance, fixedallowancestotal,
- ratebasic_arr, ratehra_arr, rateconv_arr, ratemedical_arr, ratespecialallowance_arr, fixedallowancestotalrate_arr, 
- incentive, refund, grossearning, epf, vpf, employeeesirate, tds, loan, lwf, insurance,tbl_monthlysalary. mobile, advance,
- other, grossdeduction, netpay, ac_1, ac_10, ac_2, ac21, employeresirate, lwfcontr, ews, gratuity, recordtype, tbl_monthlysalary.govt_bonus_opted, govt_bonus_amt,
-  is_special_category, ctc2 ct2, batch_no,  actual_paid_ctc2, ctc, ctc_paid_days, ctc_actual_paid, mobile_deduction, salaryid, 
- employeenps, employernps, insuranceamount, familyinsurance, tbl_monthlysalary.bankaccountno, tbl_monthlysalary.ifsccode, tbl_monthlysalary.bankname, tbl_monthlysalary.bankbranch,
- totalarear netarear,arearaddedmonths, employee_esi_incentive_deduction,employer_esi_incentive_deduction,
- total_esi_incentive_deduction,salaryindaysopted,mastersalarydays salarydays,otherledgerarears otherledgerarear,otherledgerdeductions,
- attendancemode,incrementarear,
- incrementarear_basic,incrementarear_hra,incrementarear_allowance,incrementarear_gross,incrementarear_employeeesi,incrementarear_employeresi,
- lwf_employee,lwf_employer,bonus,otherledgerarearwithoutesi,otherdeductions,othervariables,otherbonuswithesi otherdeductionswithesi,tbl_monthlysalary.lwfstatecode,tbl_monthlysalary.tdsadjustment,atds,hrgeneratedon,'' disbursedledgerids,security_amt,issalaryorliability,case when issalaryorliability='L' then 'Not Verified' else 'Verified' end verificationstatus,'' hasarear,case when is_rejected='1' then 'Rejected' else 'Not Rejected' end as rejectstatus,to_char(tbl_monthlysalary.createdon,'dd-Mon-yyyy') processedon,'Valid' paiddaysstatus
-,case when epfecr_empcode is not null or issalaryorliability='L' then 'EPFPaid' else 'EPFNotPaid' end as pfpaystatus
-	FROM public.tbl_monthlysalary inner join openappointments 
-	on tbl_monthlysalary.emp_code=openappointments.emp_code
-	and openappointments.appointment_status_id<>13 
-	and coalesce(tbl_monthlysalary.is_rejected,'0')<>'1'
-	and (tbl_monthlysalary.isarear<>'Y' or tbl_monthlysalary.recordscreen='Previous Wages')
-
-	and issalaryorliability=case when (p_action='Retrieve_Salary' and coalesce(nullif(p_process_status,''),'NotProcessed')='Processed') or  (p_action='GetProcessedSalaries' and coalesce(nullif(p_process_status,''),'NotProcessed')='NotProcessed') then 'L' when (p_action='GetProcessedSalaries' and coalesce(nullif(p_process_status,''),'NotProcessed')='Processed') then 'S' end
-	-----------Processed record searech criteria-------------------
-	and tbl_monthlysalary.emp_code= case when p_criteria='Employee' then
-		p_emp_code else tbl_monthlysalary.emp_code end
-	left join (select empcode,mprmonth,mpryear,batch_no batchn,
-			   string_agg(contractno,',') contractno
-			   from cmsdownloadedwages cm 
-			   where cm.mprmonth=p_mprmonth
-			  and cm.mpryear=p_mpryear
-			  and cm.isactive='1'
-			   and cm.contractno= case when p_criteria='Order' then
-		 		p_ordernumber else cm.contractno end
-			   group by empcode,mprmonth,mpryear,batch_no
-			  ) cm
-			   on 	tbl_monthlysalary.emp_code=cm.empcode::bigint
-		and tbl_monthlysalary.batchid=cm.batchn							   
-		-----------Processed record searech criteria ends------------------- 
-		 
-	left join (select empid,pausedstatus  is_paused  
-				from ManageTempPausedSalary
-				WHERE  ManageTempPausedSalary.ProcessYear =p_mpryear
-				and ManageTempPausedSalary.ProcessMonth =p_mprmonth
-				 ) MTempPausedSalary
-				 on openappointments.emp_id=MTempPausedSalary.empid 
-				 			left join (select distinct epfecrreport.emp_code epfecr_empcode
-									   ,epfecrreport.rpt_year
-									   ,epfecrreport.rpt_month
-									   ,epfecrreport.batchid
-									 from epfecrreport
-									 where rpt_month=p_mprmonth
-									 and rpt_year=p_mpryear) tmpepfecr
-				  on tbl_monthlysalary.emp_code=tmpepfecr.epfecr_empcode
-					and tbl_monthlysalary.mpryear=tmpepfecr.rpt_year
-					and tbl_monthlysalary.mprmonth=tmpepfecr.rpt_month
-					and tbl_monthlysalary.batchid=tmpepfecr.batchid												
-				 where tbl_monthlysalary.mprmonth=p_mprmonth
-				 and tbl_monthlysalary.mpryear=p_mpryear
-				and coalesce(cm.contractno,'')= case when p_criteria='Order' then
-		 		p_ordernumber else coalesce(cm.contractno,'') end;
+ 			SELECT 'NoFNFLock' as fnfarrivalstatus /* column added for change 1.15 */, 
+				tbl_monthlysalary.mprmonth, 
+				tbl_monthlysalary.mpryear, 
+				MTempPausedSalary.is_paused, 
+				openappointments.emp_id, 
+				to_char(to_timestamp(p_mprmonth::text, 'MM'), 'Mon') || '-' || p_mpryear::text as Mon,
+				to_char(dateofjoining, 'dd/mm/yyyy') as dateofjoining, esinumber, posting_department, '' as projectname,
+				cm.contractno as contractno, '' as contractcategory, '' as contracttype, 'Active' as activeinbatch, 
+				appointment_status_id, '' as remark, 'Unlocked' as lockstatus,
+				coalesce(is_account_verified, '0')::bit as is_account_verified,
+				null as isesiexceptionalcase, null as esicexceptionmessage,
+				openappointments.emp_code, subunit, to_char(dateofleaving, 'dd-Mon-yyyy') as dateofleaving, totalleavetaken, 
+				openappointments.emp_name, openappointments.post_offered, openappointments.emp_address, openappointments.email,
+				mobilenum, openappointments.pancard, openappointments.gender, to_char(openappointments.dateofbirth, 'dd/mm/yyyy') as dateofbirth, 
+				openappointments.fathername, openappointments.residential_address, openappointments.pfnumber, openappointments.uannumber, 
+				lossofpay, paiddays, monthdays, ratebasic, ratehra, rateconv, ratemedical, ratespecialallowance, 
+				fixedallowancestotalrate, basic, hra, conv, medical, specialallowance, fixedallowancestotal,
+				ratebasic_arr, ratehra_arr, rateconv_arr, ratemedical_arr, ratespecialallowance_arr, fixedallowancestotalrate_arr, 
+				incentive, refund, grossearning, epf, vpf, employeeesirate, tds, loan, lwf, insurance, tbl_monthlysalary.mobile, advance,
+				other, grossdeduction, netpay, ac_1, ac_10, ac_2, ac21, employeresirate, lwfcontr, ews, gratuity, recordtype, 
+				tbl_monthlysalary.govt_bonus_opted, govt_bonus_amt, is_special_category, ctc2 as ct2, batch_no, actual_paid_ctc2, 
+				ctc, ctc_paid_days, ctc_actual_paid, mobile_deduction, salaryid, employeenps, employernps, insuranceamount, 
+				familyinsurance, tbl_monthlysalary.bankaccountno, tbl_monthlysalary.ifsccode, tbl_monthlysalary.bankname, tbl_monthlysalary.bankbranch,
+				totalarear as netarear, arearaddedmonths, employee_esi_incentive_deduction, employer_esi_incentive_deduction,
+				total_esi_incentive_deduction, salaryindaysopted, mastersalarydays as salarydays, otherledgerarears as otherledgerarear, 
+				otherledgerdeductions, attendancemode, incrementarear, incrementarear_basic, incrementarear_hra, incrementarear_allowance, 
+				incrementarear_gross, incrementarear_employeeesi, incrementarear_employeresi, lwf_employee, lwf_employer, bonus, 
+				otherledgerarearwithoutesi, otherdeductions, othervariables, otherbonuswithesi as otherdeductionswithesi, 
+				tbl_monthlysalary.lwfstatecode, tbl_monthlysalary.tdsadjustment, atds, hrgeneratedon, '' as disbursedledgerids, 
+				security_amt, issalaryorliability, 
+				case when issalaryorliability='L' then 'Not Verified' else 'Verified' end as verificationstatus, 
+				'' as hasarear, 
+				case when is_rejected='1' then 'Rejected' else 'Not Rejected' end as rejectstatus, 
+				to_char(tbl_monthlysalary.createdon, 'dd-Mon-yyyy') as processedon, 'Valid' as paiddaysstatus,
+				case when epfecr_empcode is not null or issalaryorliability='L' then 'EPFPaid' else 'EPFNotPaid' end as pfpaystatus
+		from public.tbl_monthlysalary 
+		inner join openappointments on tbl_monthlysalary.emp_code = openappointments.emp_code
+			and openappointments.appointment_status_id <> 13 
+			and coalesce(tbl_monthlysalary.is_rejected, '0') <> '1'
+			and (tbl_monthlysalary.isarear <> 'Y' or tbl_monthlysalary.recordscreen = 'Previous Wages')
+			and issalaryorliability = case 
+				when (p_action='Retrieve_Salary' and coalesce(nullif(p_process_status,''),'NotProcessed')='Processed') or (p_action='GetProcessedSalaries' and coalesce(nullif(p_process_status,''),'NotProcessed')='NotProcessed') then 'L' 
+				when (p_action='GetProcessedSalaries' and coalesce(nullif(p_process_status,''),'NotProcessed')='Processed') then 'S' 
+			end
+		
+		/* Processed record search criteria */
+		and tbl_monthlysalary.emp_code = case when p_criteria='Employee' then p_emp_code else tbl_monthlysalary.emp_code end
+		left join (
+			select empcode, mprmonth, mpryear, batch_no as batchn, string_agg(contractno,',') as contractno
+			from cmsdownloadedwages cm 
+			where cm.mprmonth = p_mprmonth
+				and cm.mpryear = p_mpryear
+				and cm.isactive = '1'
+				and cm.contractno = case when p_criteria='Order' then p_ordernumber else cm.contractno end
+			group by empcode, mprmonth, mpryear, batch_no
+		) cm on tbl_monthlysalary.emp_code = cm.empcode::bigint and tbl_monthlysalary.batchid = cm.batchn							   
+		
+		left join (
+			select empid, pausedstatus as is_paused  
+			from ManageTempPausedSalary
+			where ManageTempPausedSalary.ProcessYear = p_mpryear
+				and ManageTempPausedSalary.ProcessMonth = p_mprmonth
+		) MTempPausedSalary on openappointments.emp_id = MTempPausedSalary.empid 
+		
+		left join (
+			select distinct epfecrreport.emp_code as epfecr_empcode, epfecrreport.rpt_year, epfecrreport.rpt_month, epfecrreport.batchid
+			from epfecrreport
+			where rpt_month = p_mprmonth and rpt_year = p_mpryear
+		) tmpepfecr on tbl_monthlysalary.emp_code = tmpepfecr.epfecr_empcode
+			and tbl_monthlysalary.mpryear = tmpepfecr.rpt_year
+			and tbl_monthlysalary.mprmonth = tmpepfecr.rpt_month
+			and tbl_monthlysalary.batchid = tmpepfecr.batchid												
+		where tbl_monthlysalary.mprmonth = p_mprmonth
+			and tbl_monthlysalary.mpryear = p_mpryear
+			and coalesce(cm.contractno,'') = case when p_criteria='Order' then p_ordernumber else coalesce(cm.contractno,'') end;
 			 
 return sal;				 
 end if;
