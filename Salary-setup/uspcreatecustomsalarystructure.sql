@@ -320,15 +320,22 @@ into v_monthlynontaxable_bonus;
 				)on commit drop;
 		
 				insert into tmpsalarycomponent		
-				select *  from jsonb_populate_recordset(null::record,p_salarystructure::jsonb) 
+				select salary_component_id,
+					   salary_component_name,
+					   coalesce(nullif(trim(percentage_ctc),''),'0')::numeric(18,2) as percentage_ctc,
+					   percentage_fixed,
+					   is_taxable,
+					   ispfapplicable,			
+					   coalesce(nullif(trim(salary_component_amount),''),'0')::numeric(18,2) as salary_component_amount
+				from jsonb_populate_recordset(null::record,p_salarystructure::jsonb) 
                             as (
 									salary_component_id	text,
 									salary_component_name	varchar(100),
-									percentage_ctc		numeric(18,2),
+									percentage_ctc		text,
 									percentage_fixed	varchar(30),
 									is_taxable			varchar(1),
 									ispfapplicable			varchar(1),			
-									salary_component_amount	numeric(18,2)
+									salary_component_amount	text
 							);
 
 	/****************change 2.4 starts**************************/ 
