@@ -150,6 +150,7 @@ Version Date			Change								Done_by
 	-- 1. ATTENDANCE INITIALIZATION
 	-- Extract download wages information based on attendance mode.
 	-- If manual, take the direct values, else query the pregenerate table.
+	-- attendance mode =>Ledger, MPR,Manual
 	-- =================================================================================================
 	select *
 	into v_cmsdownloadedwages
