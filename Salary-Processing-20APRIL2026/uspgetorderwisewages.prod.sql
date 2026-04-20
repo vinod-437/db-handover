@@ -149,6 +149,7 @@ Version Date			Change								Done_by
 1.50	14-APR-2026	JIVO da-days rate	 Vinod Kumar
 *************************************************************************/
 
+-- STEP 1: Initialize override values if a payment advice record is explicitly provided
 if not p_paymentadvice is null then
 	v_adviceexists:=1;
 	v_salaryid:=coalesce(p_paymentadvice.salaryid,0);
@@ -159,6 +160,7 @@ v_monthdays:=date_part('day',DATE_TRUNC('MONTH', (p_mpryear||'-'||p_mprmonth||'-
 select * from openappointments where emp_code=p_emp_code into v_openappointments;
 
 /**********************change 1.35 starts***************************************************/
+-- STEP 2: Calculate Custom Payroll Cycles (e.g. 26th to 25th) utilizing 'mst_account_custom_month_settings'
 -- select  (make_date(p_mpryear::int, p_mprmonth::int,month_start_day)- interval '1 month')::date start_dt
 -- , make_date(p_mpryear::int, p_mprmonth::int,month_end_day)::date  end_dt
 -- Change - START [1.37]
@@ -186,6 +188,7 @@ v_rec_payrolldates.end_dt:=coalesce(v_rec_payrolldates.end_dt,(make_date(p_mprye
 
 select * from empsalaryregister where appointment_id=v_openappointments.emp_id and isactive='1' into v_empsalaryregister;
 
+	-- STEP 3: Setup basic working days & shift definitions for calculations
 	if coalesce(v_empsalaryregister.flexiblemonthdays,'N')='Y' then
 		v_monthdays:=p_paymentadvice.monthdays;
 	end if;
@@ -249,6 +252,7 @@ v_barepaiddays:=least(v_salarycalendardays,v_totalsalarydays);
 					,'CHILDREN EDUCATION ALLOWANCE','GRATUITY IN HAND')
 				)t;
 **********************change 1.46 ends**************************/
+-- STEP 4: Parse & distribute "Other Earning Components" specified in the salary JSON structure
 v_incentivedays:=coalesce(p_paymentadvice.incentivepaiddays,0);
 if v_otherearningcomponents is not null then
  WITH tmp AS (
@@ -279,6 +283,7 @@ end if;
 /**********************change 1.46 ends************************/
 
 /***********Weekdays OT*************************/
+-- STEP 5: Calculate Weekdays Overtime based on OT rules and daily attendance hours mapped against shift hours
 with v1 as(
 select emp_code, a.id,c.ot_rule_name,c.effective_date,a.customeraccountid,a.overtime_rate,a.double_time_rate,a.category_type,a.category_type_name,
 after_overtime_hours,after_doubletime_hours,default_shift_time_from,default_shift_time_to,is_night_shift,
@@ -328,6 +333,7 @@ on ((v2.attendance_type='HO' and v1.category_type=4 and no_of_hours_worked is no
 into v_overtime;
 v_overtime:=coalesce(v_overtime,0);
 /***********Weekly and Consecutive 7 days OT*************************/
+-- STEP 6: Calculate Weekly and Consecutive 7-Day Overtime rules based on aggregated weekly hours
 with v1 as(
 select emp_code, a.id,c.ot_rule_name,c.effective_date,a.customeraccountid,a.overtime_rate,a.double_time_rate,a.category_type,a.category_type_name,
 after_overtime_hours,after_doubletime_hours,default_shift_time_from,default_shift_time_to,is_night_shift,
@@ -380,6 +386,7 @@ v_weekly_consecutive_overtime:=coalesce(v_weekly_consecutive_overtime,0);
 v_overtime:=v_overtime+v_weekly_consecutive_overtime;	
 /****************change 1.31 ends*******************************/
 /**************************1.36 starts**********************************************/
+	-- STEP 7: Fetch fines (Late/Early deductions) and employer-approved overtime overrides directly from attendance
 	select sum(latehoursdeduction) latehoursdeduction,sum(earlyhoursdeduction) earlyhoursdeduction
 	,sum(overtime_amount_approved_by_employer) overtime_amount_approved_by_employer
 	from tbl_monthly_attendance 
@@ -396,6 +403,7 @@ if coalesce(v_empsalaryregister.ishourlysetup,'N')='Y' then
 	v_overtime:=0;
 end if;
 /*********change 1.32 Tea Allowance Calculation*****************/
+-- STEP 8: Calculate daily 'Tea Allowance' utilizing dynamic time thresholds
 with 
 v1 as (
 select id as tearateid,hours_range_to-hours_range_from,
@@ -435,6 +443,7 @@ select sum(rate) from v3 where rn=1
 into v_tea_allowance;
 v_tea_allowance:=coalesce(v_tea_allowance,0);
 /****************change 1.17*******************************/
+-- STEP 9: Compute target Financial Year and Advance bounds to accurately fetch historically paid YTD values
 if p_mprmonth in (1,2,3) then
 	v_financial_year:=(p_mpryear-1)::text||'-'||p_mpryear::text;
 else
@@ -457,6 +466,7 @@ v_advanceenddate:=to_date(v_year1::text||'-04-30','yyyy-mm-dd');
 	into v_salstartdate,v_salenddate,v_prevsaldate,v_advancesalstartdate,v_advancesalenddate;
 /****************change 1.17 ends here*******************************/
 p_createdbyip:=createdbyip;	
+-- STEP 10: Exit Early if Action is purely retrieval ('RetrieveVerified_Salary')
 if p_action='RetrieveVerified_Salary' then	
 v_querytext:='SELECT TO_CHAR(TO_TIMESTAMP ('||p_mprmonth||'::text, ''MM''), ''Mon'')'||'||''-''||'||p_mpryear::text||' AS Mon,tbl_monthlysalary.* 
 ,cmsdownloadedwages.dateofjoining
@@ -484,6 +494,7 @@ if p_criteria='Employee' then
 select emp_id,nullif(trim(pancard),'') into v_empid,v_pancard from openappointments where emp_code=p_emp_code;
 end if;
 
+-- STEP 11: Setup LWF Configurations by identifying State code
 select employeelwfrate,employerlwfrate,deductionmonths into v_lwfemployee,v_lwfemployer,v_lwfdeductionmonths from statewiselwfrate where statecode=7 and isactive='1'
 and (select customeraccountid from openappointments where emp_code=p_emp_code)<>3254;
 v_lwfemployee:=coalesce(v_lwfemployee,0);
@@ -492,6 +503,8 @@ v_lwfdeductionmonths:=coalesce(v_lwfdeductionmonths,'0');
 
 --Raise notice 'v_lwfdeductionmonths=%',v_lwfdeductionmonths;
 --v_monthdays:=date_part('day',DATE_TRUNC('MONTH', (p_mpryear||'-'||p_mprmonth||'-01')::DATE + INTERVAL '1 MONTH') - INTERVAL '1 DAY');
+
+-- STEP 12: Begin massive dynamic SQL string construction for salary computation matrix
 v_querytext:='select ';
 
 if  p_action='Save_Salary' then	
@@ -1808,6 +1821,7 @@ null esicexceptionmessage,
 return sal;				 
 end if;
 /*****************Change 1.21 ends here**************************************/
+-- STEP 13: Handle 'Retrieve_Salary' requests for already processed records, fetching fully verified data
  if (coalesce(nullif(p_process_status,''),'NotProcessed')='Processed' and p_action='Retrieve_Salary') then
  			open sal for 
 			SELECT 'NoFNFLock' fnfarrivalstatus/* column added for change 1.15*/,tbl_monthlysalary.mprmonth, tbl_monthlysalary.mpryear,MTempPausedSalary.is_paused ,
@@ -1884,6 +1898,7 @@ null esicexceptionmessage,
 return sal;				 
 end if;
 if p_action='Save_Salary' then	
+-- STEP 14: Final Save Flow - ensures account is verified and NOT an attendance-only profile before saving
 if ((select coalesce(is_account_verified,'0')::bit from openappointments where emp_code=p_emp_code)='1' or((select coalesce(ta.payout_mode_type,'') from openappointments inner join tbl_account ta on openappointments.customeraccountid=ta.id where emp_code=p_emp_code) in ('self','hybrid')))
 	and not EXISTS
 		(
@@ -1912,7 +1927,7 @@ else
 end if;
 	/***************************Changes for 1.34 ends****************/	
 	
-	
+	-- STEP 15: Commit computed matrix array (stored in tmp_sal via EXECUTE v_querytext earlier) into final 'tbl_monthlysalary'
 		v_querytext:='insert into tbl_monthlysalary ( mprmonth, mpryear, batchid, createdby, createdon, createdbyip,arearids,tptype, emp_code, subunit, dateofleaving, totalleavetaken, emp_name, post_offered, emp_address, email, mobilenum, pancard, gender, dateofbirth, fathername, residential_address, pfnumber, uannumber, lossofpay, paiddays, monthdays, ratebasic, ratehra, rateconv, ratemedical, ratespecialallowance, fixedallowancestotalrate, basic, hra, conv, medical, specialallowance, fixedallowancestotal, ratebasic_arr, ratehra_arr, rateconv_arr, ratemedical_arr, ratespecialallowance_arr, fixedallowancestotalrate_arr, incentive, refund, grossearning, epf, vpf, employeeesirate, tds, loan, lwf, insurance, mobile, advance, other, grossdeduction, netpay, ac_1, ac_10, ac_2, ac21, employeresirate, lwfcontr, ews, gratuity, recordtype, govt_bonus_opted, govt_bonus_amt, modifiedby, modifiedon, modifiedbyip, is_special_category, ctc2,batch_no,actual_paid_ctc2,ctc,ctc_paid_days,ctc_actual_paid,mobile_deduction,salaryid,employeenps,employernps,insuranceamount,familyinsurance,bankaccountno, ifsccode, bankname, bankbranch,totalarear,arearaddedmonths,employee_esi_incentive_deduction,employer_esi_incentive_deduction,total_esi_incentive_deduction,salaryindaysopted,mastersalarydays,otherledgerarears,otherledgerdeductions,attendancemode,incrementarear,incrementarear_basic,incrementarear_hra,incrementarear_allowance,incrementarear_gross,incrementarear_employeeesi,incrementarear_employeresi,lwf_employee,lwf_employer,bonus,otherledgerarearwithoutesi,otherdeductions,othervariables,otherbonuswithesi,lwfstatecode,tdsadjustment,atds,hrgeneratedon,disbursedledgerids,security_amt,issalaryorliability,professionaltax,ratesalarybonus,ratecommission,ratetransport_allowance,ratetravelling_allowance,rateleave_encashment,rateovertime_allowance,ratenotice_pay,ratehold_salary_non_taxable,ratechildren_education_allowance,rategratuityinhand,salarybonus,commission,transport_allowance,travelling_allowance,leave_encashment,overtime_allowance,notice_pay,hold_salary_non_taxable,children_education_allowance,gratuityinhand,tea_allowance,pfapplicablecomponents,esiapplicablecomponents,isgroupinsurance,employerinsuranceamount,charity_contribution_amount,mealvoucher,payment_record_id,isarear,recordscreen,isarearprocessed,arearprocessmonth,arearprocessyear,multipayoutrequestid,is_advice,salaryjson,otherearningcomponents,paymenttypeid) 
 		select *,'|| coalesce(nullif(p_payment_recordid,-9999)::text,'null')
 		||','''||v_isarear||''','''||v_recordscreen||''','''||v_isarearprocessed||''',nullif('||v_arearprocessmonth||',0),nullif('||v_arearprocessyear||',0),' ||p_multipayoutrequestid||'
@@ -1964,6 +1979,7 @@ end if;
 /*****************Change 1.9 ends*****************************/	
 
 	if p_criteria='Employee' then	
+		-- STEP 16: Flag mapped ledgers as 'disbursed' globally blocking duplications
 		update tbl_employeeledger 
 		set isledgerdisbursed='1',
 			ledgerbatchid=p_batch_no,
@@ -1979,6 +1995,7 @@ end if;
 	
 	delete from paymentadvice where emp_code=p_emp_code and paymentadvice_id=p_paymentadvice.paymentadvice_id;
 /*****************Change 1.43 starts*****************************/	
+	-- STEP 17: Save Meal Vouchers dynamically based on configuration mapped within 'mstmealvoucher'
 	if exists(select * from mstmealvoucher where emp_code=p_emp_code and isactive='1' and effectivefromdate<=make_date(p_mpryear,p_mprmonth,1) and (effectivetodate>=make_date(p_mpryear,p_mprmonth,1) or effectivetodate is null))
 	and not exists(select * from trnmealvoucher where emp_code=p_emp_code and isactive='1' and mealmonth=p_mprmonth and mealyear=p_mpryear)
 	then

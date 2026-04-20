@@ -28,8 +28,10 @@ Version Date			Change								Done_by
 1.0		06-Jun-2025		Initial Version						Shiv Kumar
 1.1		08-Jul-2025		hrgenerated as per Salary Month		Shiv Kumar
 *************************************************************************/
+-- STEP 1: Fetch employee appointment and customer account details
 select * from  openappointments into v_openappointments where emp_code=p_emp_code;
 select * from tbl_account where id=v_openappointments.customeraccountid into v_tbl_account;
+-- STEP 2: Verify the employee is eligible for salary processing (Skip if configured for attendance/leave only)
 if not EXISTS
 		(
 		SELECT 1
@@ -37,14 +39,17 @@ if not EXISTS
 		WHERE input_ou_ids::bigint in (select id from tbl_org_unit_geofencing where is_attendance_leave_only='Y')
 		) then
 	if p_action='MoveAttendanceToWages' then
+		-- STEP 3: Exit early if standard (non-multipayout) salary is already successfully processed for the month
 		if exists(select * from tbl_monthlysalary where emp_code=p_emp_code and mprmonth=p_month and mpryear=p_year and is_rejected='0' and attendancemode='MPR' and multipayoutrequestid=0) then
 			return;		
 		end if;
 
+			-- STEP 4: Calculate the bounds of the current payroll month
 			v_currentmonthstartdate:=(p_year::text||'-'||lpad(p_month::text,2,'0')||'-01');
 			v_currentmonthenddate:=to_char((v_currentmonthstartdate::date+interval '1 month'-interval '1 day'),'yyyy-mm-dd');
 			v_monthdays:=date_part('day',DATE_TRUNC('MONTH',make_date (p_year,p_month,1) + INTERVAL '1 MONTH') - INTERVAL '1 DAY');
 				/*****************************************************************/
+		-- STEP 5: Check if a valid wage staging record exists in 'cmsdownloadedwages'; if not, create one
 		if not exists(select * from cmsdownloadedwages where empcode=p_emp_code::text and mprmonth=p_month and mpryear=p_year and isactive='1' 
 					  			and attendancemode=p_paymentadvice.attendancemode 
 					  			and (coalesce(totalpaiddays,0)+coalesce(totalleavetaken,0))>0
@@ -59,6 +64,7 @@ if not EXISTS
 					 )
 					 then	
 					if p_paymentadvice.attendancemode<>'Manual' then
+					-- 5a: Insert a fresh staging record mapping payment advice data and employee attributes
 					INSERT INTO public.cmsdownloadedwages(
 				mprmonth, mpryear, empcode, employeename, pancardno, dateofjoining, deputeddate, projectname, contractno, 
 						agencyname, contractcategory, contracttype, dateofleaving, 
@@ -86,11 +92,15 @@ if not EXISTS
 						/*,v_working_minutes,v_shift_minutes*/,p_multipayoutrequestid
 						returning * into v_cmsdownloadedwages;
 					else
+						-- 5b: For 'Manual' mode, just fetch the existing staging record based on the batch number
 						select * from cmsdownloadedwages where empcode::bigint=p_emp_code 
 											and mprmonth=p_month and mpryear=p_year and isactive='1' 
 											and batch_no=p_paymentadvice.batch_no
 						into v_cmsdownloadedwages;
 					end if;
+					
+					-- STEP 6: Execute core wage processing by invoking 'uspgetorderwisewages'
+					-- This calculates all final salary components, taxes, and deductions
 					select public.uspgetorderwisewages(
 										p_mprmonth =>p_month,
 										p_mpryear =>p_year,
@@ -109,6 +119,9 @@ if not EXISTS
 										p_multipayoutrequestid=>p_multipayoutrequestid)
 					into v_rfcpayout;
 /*************change 1.2 starts************************************/				
+			-- STEP 7: Rollback / Cleanup Phase
+			-- If 'uspgetorderwisewages' did not successfully generate a 'tbl_monthlysalary' record (e.g. due to rejection or internal errors),
+			-- deactivate the 'cmsdownloadedwages' staging record to keep state clean.
 			if not exists (select * from tbl_monthlysalary ts
 							where ts.emp_code=p_emp_code
 								and is_rejected='0'

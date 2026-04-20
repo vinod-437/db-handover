@@ -125,6 +125,7 @@ Version 	Date			Change									Done_by
 --select emp_id from openappointments where emp_code=p_emp_code into v_emp_id;
 
 /*********change 1.2 starts*************************/
+-- STEP 1: Extract employee profile details and validation flags from openappointments
 select emp_id,case when recordsource='HUBTPCRM' then 'TP' else 'NonTP' end,coalesce(left_flag,'N'),dateofrelieveing,nullif(trim(pancard),''),customeraccountid from openappointments where emp_code=p_emp_code
 into v_emp_id,v_tptype,v_left_flag,v_dateofrelieveing,v_pancard,v_customeraccountid;
 -- if v_left_flag='Y' and current_date>v_dateofrelieveing then
@@ -139,6 +140,7 @@ else
 create temporary table tmp_tbl_monthlysalary as select * from tbl_monthlysalary where 1=2;
 end if;		
 /*********change 1.8 starts*************************/
+		-- STEP 2: Initialize a temporary table to securely parse and hold JSON ledger configurations
 		DROP  TABLE  IF EXISTS tmp_ledgers;
 	    create temp table tmp_ledgers(headid int,
 									headname varchar(100),
@@ -157,10 +159,13 @@ end if;
  
 	select * from empsalaryregister where appointment_id=v_emp_id and isactive='1' order by id desc limit 1
 	into v_empsalaryregister;	
+	
+-- STEP 3: Handle TP-specific limit calculations for Advances (Head ID 67)
 if v_tptype='TP' and v_rec.headid=67 then
 	select * from empsalaryregister where appointment_id=v_emp_id and isactive='1' order by id desc limit 1
 	into v_empsalaryregister;
 	
+	-- 3a: Identify previously disbursed advances for the current month
 	select sum(ts.netpay) netamountpaid
 		from openappointments op inner join tbl_monthlysalary ts
 		on op.emp_code=ts.emp_code
@@ -177,7 +182,7 @@ if v_tptype='TP' and v_rec.headid=67 then
 -- 		return 2;
 -- 	end if;
 
-					  
+	-- 3b: Calculate maximum allowable TP advance by checking bare balance (wallet) vs total paid
 	select (coalesce(tblrec.netamountreceived,0)-coalesce(tblpay.netamountpaid,0))::numeric(18,2) barebalance
 		from (
 			select customeraccountid,
@@ -232,6 +237,7 @@ end if;
 v_year1:=left(v_financial_year,4)::int;
 v_year2:=right(v_financial_year,4)::int;
 
+-- STEP 4: Establish boundaries for the current financial year and month
 v_startdate:=to_date(v_year1::text||'-05-01','yyyy-mm-dd');
 v_enddate:=to_date(v_year2::text||'-04-30','yyyy-mm-dd');
 
@@ -246,6 +252,8 @@ v_advanceenddate:=to_date(v_year1::text||'-04-30','yyyy-mm-dd');
 	into v_salstartdate,v_salenddate,v_prevsaldate,v_advancesalstartdate,v_advancesalenddate;
 /**************************************************************************/
 v_monthdays:=date_part('day',DATE_TRUNC('MONTH', (p_mpryear||'-'||p_mprmonth||'-01')::DATE ) - INTERVAL '1 DAY');
+
+-- STEP 5: Insert a staging 'cmsdownloadedwages' record tracking voucher processing
 -- OR p_fnfid is not null added on 19.04.2026
 INSERT INTO public.cmsdownloadedwages(
 	 mprmonth, mpryear, empcode, employeename, 
@@ -301,6 +309,7 @@ INSERT INTO public.cmsdownloadedwages(
 		limit 1
 		returning "tblAutoId",batch_no into v_generatedattendanceid,v_batchid; 
 /*******************************************/
+	-- STEP 6: Execute the financial insert mapping the voucher value into the 'tbl_employeeledger'
 	insert into tbl_employeeledger
 	(
 		emp_id,emp_code,headid,headname,amount,processmonth,processyear,
@@ -327,6 +336,7 @@ INSERT INTO public.cmsdownloadedwages(
 		where id=v_headid;
 		v_tds:=0;
 	
+	-- STEP 7: Fetch the salary register state to resolve the current active disbursement type
 	select * into v_salrecord
 	from openappointments op 
 		inner join empsalaryregister e
@@ -338,6 +348,7 @@ INSERT INTO public.cmsdownloadedwages(
 		v_disbursementmode:='Voucher';
 	end if;
 		
+	-- STEP 8: Start Tax (TDS) Computation Workflow (if ledger is taxable and not exempted)
 	if v_istaxable='Y' and coalesce(v_empsalaryregister.is_exemptedfromtds,'N')='N' then
 
 	if coalesce(p_tdsdeductionmonth,'current')<>'next' then
@@ -345,6 +356,8 @@ INSERT INTO public.cmsdownloadedwages(
 		raise notice 'v_amount=>%',v_amount;
 		raise notice 'p_month=>%',(case when p_mprmonth in (1,2,3) then 12 else p_mprmonth-1 end);
 		raise notice 'p_year=>%',(case when p_mprmonth in (1,2,3) then p_mpryear-1 else p_mpryear end);
+		
+			-- 8a: Trigger procedure to project potential new taxes applying the voucher amount
 			perform public.uspupdatetaxforsalary(
 				p_empcode =>p_emp_code,
 				p_createdby =>p_createdby,
@@ -357,6 +370,7 @@ INSERT INTO public.cmsdownloadedwages(
 				p_currenthra =>0,
 				p_batchid =>v_batchid);
 
+				-- 8b: Collect newly calculated total TDS from register
 				select e.taxes into v_tds
 				from openappointments op inner join empsalaryregister e
 				on op.emp_id=e.appointment_id 
@@ -384,6 +398,7 @@ INSERT INTO public.cmsdownloadedwages(
 		
 /**************************change 1.11 ends**************************************/	
 /****************Already Deducted TDS*********************************************/
+-- 8c: Compute historical YTD TDS deductions mapped to PAN
 select sum(case when 
 	 (
 						(
@@ -498,11 +513,13 @@ union all
 group by emp_code;
 
 --v_tds:=case when v_salrecord.jobtype='Independent Contractors' then v_amount*.01 when coalesce(v_tds,0)>=0 then (v_tds-coalesce(v_alreadytds,0)) else 0 end;
+-- 8d: Subtract historical TDS from total project tax to find the specific deduction needed for this voucher
 v_tds:=case when v_salrecord.jobtype='Independent Contractors' then v_amount*.01 when coalesce(v_tds,0)>=0 then greatest((v_tds-coalesce(v_alreadytds,0)),0) else 0 end;
 											  
 					   
 end if;
 /************************************************************/
+			-- STEP 9: Compute statutory ESI configurations based on voucher types
 			-- if coalesce(v_salrecord.employeeesirate,0) >0 then
 			if (coalesce(v_salrecord.employeeesirate,0) > 0 AND v_headid IN (5, 6)) THEN
 				v_employeresirate:=v_amount*0.03250;
@@ -559,6 +576,8 @@ end if;
 		end if;
 		v_netpay:=v_grossearning-v_grossdeduction;
 	end if;
+	
+	-- STEP 10: Create final mapped disbursement entry in 'tbl_monthlysalary'
 	with v_tbl_monthlysalary as (
 		insert into tbl_monthlysalary ( mprmonth, mpryear, batchid, createdby, createdon, createdbyip, emp_code, subunit, dateofleaving, totalleavetaken, emp_name, post_offered, emp_address, email, mobilenum, pancard, gender, dateofbirth, fathername, residential_address, pfnumber, uannumber, lossofpay, paiddays, monthdays, ratebasic, ratehra, rateconv, ratemedical, ratespecialallowance, fixedallowancestotalrate, basic, hra, conv, medical, specialallowance, fixedallowancestotal, ratebasic_arr, ratehra_arr, rateconv_arr, ratemedical_arr, ratespecialallowance_arr, fixedallowancestotalrate_arr, incentive, refund, grossearning, epf, vpf, employeeesirate, tds, loan, lwf, insurance, mobile, advance, other, grossdeduction, netpay, ac_1, ac_10, ac_2, ac21, employeresirate, lwfcontr, ews, gratuity, recordtype, govt_bonus_opted, govt_bonus_amt, is_special_category, ctc2,batch_no,actual_paid_ctc2,ctc,ctc_paid_days,ctc_actual_paid,mobile_deduction,salaryid,employeenps,employernps,insuranceamount,familyinsurance,bankaccountno, ifsccode, bankname, bankbranch,totalarear,arearaddedmonths,employee_esi_incentive_deduction,employer_esi_incentive_deduction,total_esi_incentive_deduction,salaryindaysopted,mastersalarydays,otherledgerarears,otherledgerdeductions,attendancemode,incrementarear,incrementarear_basic,incrementarear_hra,incrementarear_allowance,incrementarear_gross,incrementarear_employeeesi,incrementarear_employeresi,lwf_employee,lwf_employer,bonus,otherledgerarearwithoutesi,otherdeductions,othervariables,otherbonuswithesi,lwfstatecode,tdsadjustment,atds,hrgeneratedon,disbursedledgerids,security_amt,issalaryorliability,disbursementmode,istaxapplicable,is_billable,tptype,is_advice,tdsdeductionmonth)
 		select p_mprmonth, p_mpryear, v_batchid, p_createdby,current_timestamp,p_createdbyip,
@@ -617,6 +636,7 @@ end if;
 			insert into tmp_tbl_monthlysalary
 			select * from v_tbl_monthlysalary;
 
+		-- STEP 11: Mark original ledger line item as disbursed to block duplicate payouts
 		update tbl_employeeledger 
 		set isledgerdisbursed='1',
 			ledgerbatchid=v_batchid,
@@ -631,6 +651,7 @@ end if;
 			and id=v_generatedledgerid;
 /*********change 2.1 starts*************************/
 
+-- STEP 12: Integrate with generic workflow mapping tools
 select public.uspintegrateworkflow(
 	p_customeraccountid =>v_customeraccountid,
 	p_emp_code =>p_emp_code,

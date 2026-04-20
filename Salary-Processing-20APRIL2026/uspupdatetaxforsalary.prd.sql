@@ -49,6 +49,7 @@ Version Date			Change								Done_by
 **************************************************************************/
 select * into v_openappointments from openappointments where emp_code=p_empcode;
 
+-- STEP 1: Verify early exit condition - If the employee is explicitly exempted from TDS, zero out any existing tax and return
 if exists(select * from empsalaryregister where appointment_id=v_openappointments.emp_id and isactive='1' and is_exemptedfromtds='Y')
 then
 	update empsalaryregister set taxes= 0 where appointment_id=v_openappointments.emp_id and isactive='1' and is_exemptedfromtds='Y';
@@ -57,14 +58,17 @@ end if;
 --Raise notice 'Enable Status=%',(select tds_enablestatus from tbl_account where id=v_openappointments.customeraccountid);	
 
 v_leftflag:=coalesce(v_openappointments.left_flag,'N');
+-- STEP 2: Proceed only if the employer/customer account has TDS processing enabled
 if coalesce((select tds_enablestatus from tbl_account where id=v_openappointments.customeraccountid),'Y')='Y' then /*****change 1.1*****/
 	------------Calc Financial Year----------------------------- 
+	-- STEP 3: Identify the applicable Financial Year bounds based on the processing month
 	 if p_month between 4 and 12 then
 		v_financialyear:=p_year||'-'||(p_year+1);
 	 else
 		v_financialyear:=(p_year-1)||'-'||p_year;
 	 end if;
 	------------Find Regime----------------------------------------
+-- STEP 4: Fetch previously deposited PF/taxes from previous employers to ensure accurate tax bracket calculation
 select 
 coalesce(nullif(pf_apr2024,'')::numeric(18),0)+
 coalesce(nullif(pf_may2024,'')::numeric(18),0)+
@@ -77,6 +81,8 @@ and op.emp_code=p_empcode
 and op.customeraccountid=5484
 and v_financialyear='2024-2025'
 into v_pfpreviousemployer;
+		
+		-- STEP 5: Identify the employee's opted Tax Regime (Old vs New)
 		select regime_tye into v_regime
 		from employee_regime
 		where emp_code=p_empcode
@@ -102,7 +108,7 @@ raise notice 'p_currentvpf=>%',  p_currentvpf;
 raise notice 'p_currentprofessionaltax=>%',  p_currentprofessionaltax;
 raise notice 'p_currentmealvoucher=>%',  p_currentmealvoucher;
 
-											 
+-- STEP 6: Execute core tax calculation engine to resolve full-year tax liability and required deductions
 select * from public.Uspcalculatetaxonsalary(p_empcode,v_financialyear,v_regime,
 											 p_currentgrossearning,
 											 p_currentotherdeductions,
@@ -121,6 +127,7 @@ fetch  v_rfctax
 into  v_totalincome,v_totalsavings,v_taxableincome,v_netpayabletax,v_taxdeducted,v_balancetax,v_taxslab,v_currentmonthtaxdeducted;
 Raise Notice 'v_totalincome=%,v_totalsavings=%,v_taxableincome=%,v_netpayabletax=%,v_taxdeducted=%,v_balancetax=%,v_taxslab=%,v_currentmonthtaxdeducted=%',v_totalincome,v_totalsavings,v_taxableincome,v_netpayabletax,v_taxdeducted,v_balancetax,v_taxslab,v_currentmonthtaxdeducted;
 ------------Find Remaining Months--------------------------------------------------
+ -- STEP 7: Determine remaining months in FY to properly amortize the balance tax burden
  if p_month between 4 and 12 then
  	v_remainingmonths:=(12-p_month)+4;
  else
@@ -132,6 +139,7 @@ if v_leftflag='Y' then
 end if;
 --Change 1.1 ends
 ----------Update Tax------------------------------------------------------ 
+ -- STEP 8: Update amortized monthly tax requirement onto the salary register
  update empsalaryregister
  set taxes=case when coalesce(v_netpayabletax,0)<=0 then 0
 							when coalesce(v_netpayabletax,0)>0 and coalesce(v_netpayabletax,0)-coalesce(v_taxdeducted,0)>0 then ( coalesce(v_netpayabletax,0)-(coalesce(v_taxdeducted,0)-coalesce(v_currentmonthtaxdeducted,0)))/v_remainingmonths
@@ -144,6 +152,7 @@ end if;
 	and isactive='1';
 
 else
+	-- STEP 9: Fallback - if TDS disabled on the account, zero out auto-calculated taxes on the salary register
 	update empsalaryregister set taxupdatedon=current_timestamp,taxes=case when empsalaryregister.tdsmode='Manual' then taxes else 0 end where appointment_id=v_openappointments.emp_id;
 end if;		
 return 1;

@@ -31,8 +31,10 @@ Version Date			Change								Done_by
 1.0		10-May-2024     Initial Version						Shiv Kumar
 1.1		04-Jun-2024     TDS Condition					Shiv Kumar
 *************************************************************************/
+-- STEP 1: Verify if the customer account has TDS functionality enabled
 if coalesce((select tds_enablestatus from tbl_account where id=p_customeraccountid),'Y')='Y' then /*****change 1.1*****/
 	/*************Change 1.2 starts*********************/
+		-- STEP 2: Pre-generate a simulated wage record based on the provided attendance/paid days
 		select 	uspwagesfromattendance_pregenerate(
 					p_action =>'GenerateWages_pregenerate',
 					p_emp_code =>p_emp_code,
@@ -49,6 +51,7 @@ if coalesce((select tds_enablestatus from tbl_account where id=p_customeraccount
 
 	--if v_recadvice.paiddays>0 then
 --Raise Notice 'p_currentgrossearning =>%',v_recadvice.grossearning;		
+	-- STEP 3: Pass the pre-generated salary components to the tax engine to recalculate standard/projected TDS
 	select public.uspupdatetaxforsalary(
 		p_empcode =>p_emp_code,
 		p_createdby =>p_createdby,
@@ -69,6 +72,7 @@ if coalesce((select tds_enablestatus from tbl_account where id=p_customeraccount
 	--end if;
 	end if;
 else
+	-- STEP 4: Fallback - if TDS is disabled on the account, zero out auto-calculated taxes on the salary register
 	update empsalaryregister set taxes=case when empsalaryregister.tdsmode='Manual' then taxes else 0 end ,taxupdatedon=current_timestamp where appointment_id=(select emp_id from openappointments where emp_code=p_emp_code);
 end if;	
 return 1;

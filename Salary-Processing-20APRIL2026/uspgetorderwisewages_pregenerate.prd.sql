@@ -160,11 +160,13 @@ else
 	from cmsdownloadedwages_pregenerate cp into v_totalsalarydays;
 end if;
 /****************change 1.17*******************************/
+-- STEP 1: Define default month bounds using standard calendar logic
 v_monthdays:=date_part('day',DATE_TRUNC('MONTH', (p_mpryear||'-'||p_mprmonth||'-01')::DATE + INTERVAL '1 MONTH') - INTERVAL '1 DAY');
 select * from openappointments where emp_code=p_emp_code into v_openappointments;
 select * from tbl_account where id=v_openappointments.customeraccountid into v_tbl_account;
 /****************change 1.31 starts*****************************/
 select * from empsalaryregister where appointment_id=v_openappointments.emp_id and isactive='1' into v_empsalaryregister;
+	-- STEP 2: Configure actual working days - Subtract holiday overrides if 'flexiblemonthdays' is enabled
 	if coalesce(v_empsalaryregister.flexiblemonthdays,'N')='Y' then
 		select count(*) into v_holidaycount from public.usp_get_weekly_off_n_holiday_dates (p_accountid =>v_tbl_account.id, p_emp_id  =>v_openappointments.emp_id,p_month =>p_mprmonth,p_year =>p_mpryear);
 		v_monthdays:=v_monthdays-coalesce(v_holidaycount,0);
@@ -183,32 +185,7 @@ SELECT
 FROM vw_user_spc_emp WHERE emp_code=p_emp_code
 INTO v_shifthours;
 /**************change 1.39 ends***********************************/
-																  
-																																																
-
-																																																																							  
-																																																																								  
-															  
-
-					  
-														   
-									  
-												 
-									
-   
-																					 
-		   
-		
-								   
-											   
-			
-													   
-							   
-				   
-																
-									 
-																							  
-											
+						
 											
 																					
 	   
@@ -224,38 +201,13 @@ if coalesce(v_empsalaryregister.ishourlysetup,'N')='Y' then
 	end if;
 end if;	
 /**************************1.49 ends***********************************************/
-																  
-											
-			  
-			
-																																				
-																		  
-	 
-		
-  
-							  
-															  
-															  
-																																							 
-																																					 
-																																						  
-		 
-  
-
-																 
-											 
-												   
-																										 
-									
-			
-						   
-		  
-
+	
 	   
 /**********************change 1.34 starts***************************************************/
 -- select  (make_date(p_mpryear::int, p_mprmonth::int,month_start_day)- interval '1 month')::date start_dt
 -- , make_date(p_mpryear::int, p_mprmonth::int,month_end_day)::date  end_dt
 -- Change - START [1.35]
+-- STEP 3: Setup dynamic Start and End dates for custom-cycle payroll systems (e.g., 26th to 25th)
 SELECT
 		-- added by vinod dated. 23.06.2025
 		CASE WHEN month_direction='F' THEN make_date(p_mpryear::int, p_mprmonth::int,month_start_day)::date
@@ -280,6 +232,7 @@ if coalesce(v_rec_payrolldates.month_start_day,0)>1 and coalesce(v_rec_payrollda
 	v_isbackward:='Y';
 end if;
 /***********Weekdays OT*************************/
+-- STEP 4: Calculate Shift-Based Weekday Overtime logic derived from daily working hours mapping
 with v1 as(
 select emp_code, a.id,c.ot_rule_name,c.effective_date,a.customeraccountid,a.overtime_rate,a.double_time_rate,a.category_type,a.category_type_name,
 after_overtime_hours,after_doubletime_hours,default_shift_time_from,default_shift_time_to,is_night_shift,
@@ -329,6 +282,7 @@ on ((v2.attendance_type='HO' and v1.category_type=4 and no_of_hours_worked is no
 into v_overtime;
 v_overtime:=coalesce(v_overtime,0);
 /***********Weekly and Consecutive 7 days OT*************************/
+-- STEP 5: Calculate Weekly and Consecutive Shift Overtime mapping
 with v1 as(
 select emp_code, a.id,c.ot_rule_name,c.effective_date,a.customeraccountid,a.overtime_rate,a.double_time_rate,a.category_type,a.category_type_name,
 after_overtime_hours,after_doubletime_hours,default_shift_time_from,default_shift_time_to,is_night_shift,
@@ -380,6 +334,7 @@ into v_weekly_consecutive_overtime;
 v_weekly_consecutive_overtime:=coalesce(v_weekly_consecutive_overtime,0);
 v_overtime:=v_overtime+v_weekly_consecutive_overtime;
 /**************************1.36 starts**********************************************/
+	-- STEP 6: Apply Late/Early fines & employer-approved manual overtime figures mapped from attendance tables
 	select sum(latehoursdeduction) latehoursdeduction,sum(earlyhoursdeduction) earlyhoursdeduction
 	,sum(overtime_amount_approved_by_employer) overtime_amount_approved_by_employer
 	from tbl_monthly_attendance 
@@ -396,6 +351,7 @@ if coalesce(v_empsalaryregister.ishourlysetup,'N')='Y' then
 end if;
 /**************************1.36 ends***********************************************/
 /*********Tea Allowance Calculation*****************************/
+-- STEP 7: Calculate Tea Allowance bounds utilizing dynamic thresholds mapped to shift durations
 with 
 v1 as (
 select id as tearateid,hours_range_to-hours_range_from,
@@ -438,6 +394,7 @@ v_tea_allowance:=coalesce(v_tea_allowance,0);
 /****************change 1.31 ends*******************************/
 --select count(*) from cmsdownloadedwages_pregenerate into v_cnt;
 
+-- STEP 8: Construct accurate Financial Year bounds based on processing month logic to retrieve matching historical payments
 if p_mprmonth in (1,2,3) then
 	v_financial_year:=(p_mpryear-1)::text||'-'||p_mpryear::text;
 else
@@ -460,6 +417,7 @@ v_advanceenddate:=to_date(v_year1::text||'-04-30','yyyy-mm-dd');
 	into v_salstartdate,v_salenddate,v_prevsaldate,v_advancesalstartdate,v_advancesalenddate;
 /****************change 1.17 ends here*******************************/
 p_createdbyip:=createdbyip;	
+-- STEP 9: Quick escape - Simply return fetched data immediately without compiling dynamics if 'RetrieveVerified_Salary'
 if p_action='RetrieveVerified_Salary' then	
 v_querytext:='SELECT TO_CHAR(TO_TIMESTAMP ('||p_mprmonth||'::text, ''MM''), ''Mon'')'||'||''-''||'||p_mpryear::text||' AS Mon,tbl_monthlysalary.* 
 ,cmsdownloadedwages.dateofjoining
@@ -488,6 +446,7 @@ end if;
 
 select employeelwfrate,employerlwfrate,deductionmonths into v_lwfemployee,v_lwfemployer,v_lwfdeductionmonths from statewiselwfrate where statecode=7 and isactive='1'
 and (select customeraccountid from openappointments where emp_code=p_emp_code)<>3254;
+-- STEP 10: Dynamically assemble massive selection query (v_querytext) to map simulated rows into fully structured result sets
 v_querytext:='select ';
 
 if  p_action='Save_Salary' then	
