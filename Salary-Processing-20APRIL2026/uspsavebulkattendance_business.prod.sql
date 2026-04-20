@@ -379,7 +379,8 @@ end if;
 	if not EXISTS
 		(
 		SELECT 1
-		FROM unnest(string_to_array((select COALESCE(COALESCE(NULLIF(op.assigned_ou_ids, ''),'0')) from openappointments op where op.emp_code=v_emp_code), ',')) AS input_ou_ids
+		FROM unnest(string_to_array((select COALESCE(COALESCE(NULLIF(op.assigned_ou_ids, ''),'0')) from 
+		openappointments op where op.emp_code=v_emp_code), ',')) AS input_ou_ids
 		WHERE input_ou_ids::bigint in (select id from tbl_org_unit_geofencing where is_attendance_leave_only='Y')
 		) then
 		
@@ -390,7 +391,8 @@ end if;
 			where emp_code=v_emp_code 
 			and customeraccountid=p_customeraccountid
 			--and att_date between v_rec_payrolldates.start_dt and v_rec_payrolldates.end_dt
-			and tbl_monthly_attendance.att_date between greatest(v_rec_payrolldates.start_dt,v_openappointments.dateofjoining) and least(v_rec_payrolldates.end_dt,coalesce(v_openappointments.dateofrelieveing,v_rec_payrolldates.end_dt))
+			and tbl_monthly_attendance.att_date between greatest(v_rec_payrolldates.start_dt,v_openappointments.dateofjoining) 
+			and least(v_rec_payrolldates.end_dt,coalesce(v_openappointments.dateofrelieveing,v_rec_payrolldates.end_dt))
 			and isactive='1'
 			and approval_status='A'	
 			and no_of_hours_worked is not null
