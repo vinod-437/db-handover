@@ -80,6 +80,7 @@ Version Date			Change								Done_by
 1.14	20-Mar-2026		Add customeraccountid check 
 						to monthly Attendance					Antigravity [Vinod]
 *************************************************************************/
+-- STEP 1: Verify geofencing rules - Exit entirely if employee belongs to an "Attendance Leave Only" org unit
 if not EXISTS
 		(
 		SELECT 1
@@ -97,6 +98,7 @@ v_monthdays:=date_part('day',DATE_TRUNC('MONTH', (p_year||'-'||p_month||'-01')::
 -- select  (make_date(p_year::int, p_month::int,month_start_day)- interval '1 month')::date start_dt
 -- , make_date(p_year::int, p_month::int,month_end_day)::date  end_dt
 -- Change - START [1.4]
+-- STEP 2: Fetch and align Custom Payroll Date Cycles defined by customer account (e.g. 26th to 25th)
 SELECT
 
 -- added by vinod dated. 23.06.2025
@@ -116,6 +118,7 @@ v_rec_payrolldates.start_dt:=coalesce(v_rec_payrolldates.start_dt,make_date(p_ye
 v_rec_payrolldates.end_dt:=coalesce(v_rec_payrolldates.end_dt,(make_date(p_year::int, p_month::int,1)+ interval '1 month -1 day')::date);
 --Raise Notice 'v_rec_payrolldates.start_dt=%,v_rec_payrolldates.end_dt=%',v_rec_payrolldates.start_dt,v_rec_payrolldates.end_dt;
 /**********************change 1.35 ends***************************************************/	
+	-- STEP 3: Adjust attendance bounds for mid-month Joiners (DOJ) and Leavers (DOR)
 	if (to_char(v_doj,'mmyyyy'))=(lpad(p_month::text,2,'0')||p_year::text) then
 			v_joiningdayspast:=(to_char(v_doj,'dd')::int)-1;
 	end if;
@@ -143,6 +146,7 @@ v_rec_payrolldates.end_dt:=coalesce(v_rec_payrolldates.end_dt,(make_date(p_year:
 	v_isattendancerequiredemployee:=v_empsalaryregister.isattendancerequired;
 	
 /***********************Check Approved and unapproved attendance*********************/	
+	-- STEP 4: Poll `tbl_monthly_attendance` to segregate approved and unapproved logs within processing dates
 	if exists(select 1 from tbl_monthly_attendance 
 		where customeraccountid=v_customeraccountid and emp_code=p_emp_code and att_date between greatest(v_rec_payrolldates.start_dt,v_doj) and least(v_rec_payrolldates.end_dt,coalesce(v_dor,v_rec_payrolldates.end_dt))
 		and attendance_salary_status='1' and is_attendance_salary='Salary' and approval_status='A'
@@ -177,6 +181,7 @@ end if;
 			v_leavetaken:=0;
 			v_advance_or_current:='Current';
 		else	/****************Attendance Not Required Block************************************/  			
+			-- STEP 5: Auto/Fixed Mode - bypass detailed attendance matching; assign full month days directly minus join/leave offsets
 			if v_isattendancerequiredemployer='Auto' or v_isattendancerequiredemployee='N' then 
 				select (case when e.salaryindaysopted='Y' then e.salarydays else v_monthdays end) as salarydays
 					FROM empsalaryregister e inner join openappointments op
@@ -192,6 +197,7 @@ end if;
 			else
 			
 			/****************Hourly Setup Block************************************/  
+			-- STEP 6: Hourly Setup - calculate rigorous base shift durations fetching dynamic break policies and settings
 			if exists(select * from openappointments op inner join empsalaryregister e on op.emp_id=e.appointment_id and op.emp_code=p_emp_code and e.ishourlysetup='Y' and e.isactive='1') then
 			    -- select default_shift_full_hours from vw_user_spc_emp where emp_code=p_emp_code into v_default_shift_full_hours;
 				-- v_default_shift_full_hours:=coalesce(v_default_shift_full_hours,'08:00');
@@ -273,6 +279,7 @@ end if;
 
 				v_shift_minutes := (v_shift_minutes - (EXTRACT(EPOCH FROM v_total_break_unpaid::INTERVAL)/60));
 
+				-- STEP 7: Aggregate exact clocked working minutes resolving half-days, holiday overrides, and specific overtime mappings
 				select sum(
 				/************Change 1.12 starts**********************************/
 				case when coalesce(att_type_proposed,'') in ('HO','WO') and attendance_type ='PP'  and p_multipayoutrequestid =0 
@@ -326,6 +333,7 @@ end if;
 				into v_rec_attendance;	  
 				  
 			/****************Advance Block************************************/  
+			-- STEP 8: Salary Mode 'Advance' - Determine paid and leave days from standard (non-hourly) approved attendance statuses
 			elsif exists(select 1 from tbl_monthly_attendance 
 						where customeraccountid=v_customeraccountid and emp_code=p_emp_code and att_date between v_rec_payrolldates.start_dt and v_rec_payrolldates.end_dt
 						and attendance_salary_status='1' and is_attendance_salary='Salary' and approval_status='A'
@@ -389,6 +397,7 @@ end if;
 				v_advance_or_current:='Advance';
 				/****************Current Block************************************/  
 				else
+					-- STEP 9: Salary Mode 'Current' - Standard iteration accumulating specific daily log types
 					if coalesce(v_empsalaryregister.flexiblemonthdays,'N')='N' then
 					select sum(case when attendance_type in ('PP','HO','WO','WFH','OD','TR','ASL') then 1 
 										when attendance_type in ('HD') then 0.5 end) paiddays,
@@ -452,6 +461,7 @@ end if;
 	and (not exists(select * from paymentadvice where emp_code=p_emp_code and mprmonth=p_month and mpryear=p_year and advicelockstatus='Locked'  and attendancemode='MPR')
 		 or p_multipayoutrequestid<>0)
 	then
+	-- STEP 10: Create an isolated in-memory temporary table to simulate "downloaded wages" based on the tabulated logic
 	drop table if exists pg_temp.cmsdownloadedwages_pregenerate;						
 	create /*GLOBAL*/ temporary table pg_temp.cmsdownloadedwages_pregenerate
 	as
@@ -496,6 +506,7 @@ if v_empsalaryregister.fullmonthincentiveapplicable='Y' and v_monthpresentdays>=
 		v_fullmonthincentive:=coalesce(nullif(v_empsalaryregister.grossearningcomponents,0),v_empsalaryregister.gross)/case when v_empsalaryregister.salaryindaysopted='Y' then v_empsalaryregister.salarydays else v_monthdays end;
 end if;
 -- Raise Notice 'p_month=% year=% p_emp_code=% =p_createdby=% p_createdbyip=% =v_cnt=% v_paiddays=% v_leavetaken=%',p_month,p_year,p_emp_code,p_createdby,p_createdbyip,v_cnt,v_paiddays,v_leavetaken;
+				-- STEP 11: Invoke the foundational wage generation procedure to mock calculations based on this temporary simulation
 				select  public.uspgetorderwisewages_pregenerate(
 										p_mprmonth =>p_month,
 										p_mpryear =>p_year,
