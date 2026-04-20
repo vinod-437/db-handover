@@ -84,6 +84,7 @@ begin
 	-- updates ledgers, and triggers pre-wage/tax calculations.
 	-- ==========================================================================================
 	if p_action='ApproveBulkAttendanceFromExcel_New' then
+		-- STEP 1: Parse incoming JSON payload to extract employee codes, month, and year
 		SELECT (json_data ->> 'empCode') AS emp_codes,(json_data ->> 'month') AS month,(json_data ->> 'year') AS year
 			into v_recattemployees	
 		FROM json_array_elements(p_attendancedates::json) AS json_data;
@@ -110,6 +111,7 @@ begin
 		v_rec_payrolldates.start_dt:=coalesce(v_rec_payrolldates.start_dt,make_date(v_year::int, v_month::int,1));
 		v_rec_payrolldates.end_dt:=coalesce(v_rec_payrolldates.end_dt,(make_date(v_year::int, v_month::int,1)+ interval '1 month -1 day')::date);
 */
+			-- STEP 2: Determine payroll start and end dates based on custom account settings or defaults
 			if coalesce(p_month_direction,'N')<>'N' then
 				v_month=p_month;
 				v_year:=p_year;
@@ -124,11 +126,14 @@ begin
 				v_rec_payrolldates.start_dt:=make_date(v_year::int, v_month::int,1);
 				v_rec_payrolldates.end_dt:=(make_date(v_year::int, v_month::int,1)+ interval '1 month -1 day')::date;	
 			end if;			
+		-- STEP 3: Setup Common Table Expressions (CTEs) to filter eligible employees and existing records
 		with tmp_emp_code as 
 			(
+				-- 3a: Convert comma-separated employee codes into a table
 				select regexp_split_to_table(v_recattemployees.emp_codes,',')::bigint  as emp_codes
 			)
 		,tbl_attendanceonly as(
+				-- 3b: Identify employees configured for attendance/leave only (no salary processing)
 				select distinct t1.emp_code from (				
 				select op.emp_code,trim(unnest(string_to_array(op.assigned_ou_ids, ',')))::bigint AS assigned_ou_ids
 		 		from openappointments op inner join tmp_emp_code on op.emp_code=tmp_emp_code.emp_codes
@@ -138,6 +143,7 @@ begin
 			)	
 			, tbl_lockedadvice as
 					(
+						-- 3c: Identify employees with locked payment advice for the target month
 						SELECT DISTINCT emp_code as adv_emp_code
 						FROM paymentadvice	WHERE paiddays > 0
 						  AND attendancemode = 'MPR'
@@ -146,6 +152,7 @@ begin
 						  AND advicelockstatus = 'Locked'
 					) 
 		,tblapproved_attendance as(
+							-- 3d: Identify employees who already have approved salary attendance
 							SELECT DISTINCT emp_code as taa_emp_code
 							FROM tbl_monthly_attendance
 							where tbl_monthly_attendance.customeraccountid = p_customeraccountid
@@ -155,6 +162,7 @@ begin
 								and p_att_purpose='Attendance'
 								)  
 		,tblmultipayout as(
+							-- 3e: Identify employees already part of a multi-payout request
 							SELECT DISTINCT emp_code as taa2_emp_code
 							FROM tbl_monthly_attendance
 							where tbl_monthly_attendance.customeraccountid = p_customeraccountid
@@ -164,6 +172,7 @@ begin
 								and multipayoutrequestid<>0
 								) 
 		,tmp1 as(	
+			-- STEP 4: Update attendance status to Approved ('A') for eligible records
 			update tbl_monthly_attendance
 				set approval_status='A',
 					modifiedby=p_createdby,
@@ -195,6 +204,7 @@ begin
 		)
 		,tbl_finerecord as
 		(
+				-- STEP 5: Calculate aggregate late coming and early going deduction hours
 				select tmp1.emp_code,sum(latehoursdeduction) latehoursdeduction,sum(earlyhoursdeduction) earlyhoursdeduction
 				from tmp1 left join tbl_attendanceonly
 				on tmp1.emp_code= tbl_attendanceonly.emp_code
@@ -205,6 +215,7 @@ begin
 		),
 	tmp3 as
 	(
+	-- STEP 6: Deactivate old/unprocessed late and early fine ledger entries
 	update tbl_employeeledger set isactive='0'
 		from tmp_emp_code inner join tbl_finerecord
 		on tmp_emp_code.emp_codes=tbl_finerecord.emp_code
@@ -218,6 +229,7 @@ begin
 	),
 	tbl_latehoursdeduction as
 	(
+		-- STEP 7: Insert new late coming fine deduction into the employee ledger
 		insert into tbl_employeeledger
 			(
 				emp_id,emp_code,headid,headname,amount,processmonth,processyear,
@@ -233,6 +245,7 @@ begin
 	tbl_earlyhoursdeduction as
 	(
 	
+			-- STEP 8: Insert new early going fine deduction into the employee ledger
 			insert into tbl_employeeledger
 			(
 				emp_id,emp_code,headid,headname,amount,processmonth,processyear,
@@ -263,6 +276,7 @@ end if;
 	-- ==========================================================================================
 	if p_action='ApproveBulkAttendanceFromExcel' then
 		v_cnt:=0;
+			-- STEP 1: Create a temporary table to store approval response messages for each employee
 			create temporary table tmpresponse_approve
 			(
 				emp_code bigint,
@@ -272,6 +286,7 @@ end if;
 				pmessage text
 			) on commit drop;
 		
+			-- STEP 2: Parse incoming JSON payload to extract employee codes, month, and year
 			SELECT (json_data ->> 'empCode') AS emp_codes,(json_data ->> 'month') AS month,(json_data ->> 'year') AS year
 				into v_recattemployees	
 			FROM    json_array_elements(p_attendancedates::json) AS json_data;
@@ -280,10 +295,12 @@ end if;
 				into v_month,v_year;
 				--RAISE NOTICE 'v_month => %', v_month;
 				--RAISE NOTICE 'v_year => %', v_year;
+		-- STEP 3: Iterate through each employee code extracted from the payload
 		for v_emp_code in (select regexp_split_to_table(v_recattemployees.emp_codes,',')::bigint)
 		loop
 			select * from openappointments where emp_code=v_emp_code into v_openappointments;
 
+			-- STEP 4: Skip approval if payment advice is already locked for the employee
 			IF EXISTS (
 				SELECT DISTINCT emp_code
 				FROM paymentadvice
@@ -300,6 +317,7 @@ end if;
 			END IF;
 
 /*****************************Change 2.0 starts*****************************************************/		
+		-- STEP 5: Calculate payroll start and end dates for validation
 		SELECT 
 			-- added on 23.06.2025 vinod
 		(CASE WHEN month_direction='F' THEN make_date(v_year::int, v_month::int,month_start_day)::date
@@ -318,6 +336,7 @@ end if;
 		v_rec_payrolldates.start_dt:=coalesce(v_rec_payrolldates.start_dt,make_date(v_year::int, v_month::int,1));
 		v_rec_payrolldates.end_dt:=coalesce(v_rec_payrolldates.end_dt,(make_date(v_year::int, v_month::int,1)+ interval '1 month -1 day')::date);
 				
+			-- STEP 6: Skip approval if advance attendance exists for salary processing
 			IF EXISTS (
 				SELECT DISTINCT emp_code
 				FROM tbl_monthly_attendance
@@ -332,6 +351,7 @@ end if;
 				continue;
 			END IF;
 /*****************************Change 2.0 ends*****************************************************/	
+				-- STEP 7: Update attendance status to Approved ('A') for the current employee's eligible dates
 				update tbl_monthly_attendance
 				set approval_status='A',
 					modifiedby=p_createdby,
@@ -355,6 +375,7 @@ end if;
 
 			insert into tmpresponse_approve	(emp_code,orgempcode,tpcode,empname,pmessage) values(v_emp_code,v_openappointments.orgempcode,v_openappointments.cjcode,v_openappointments.emp_name,' Record(s) Approved.');
 
+	-- STEP 8: Apply late coming and early going fines for employees not configured as attendance-only
 	if not EXISTS
 		(
 		SELECT 1
@@ -402,10 +423,13 @@ end if;
 			end if;	
 	end if;
 	/**************************Late Coming/Early Going block ends**********************************************/	
+			-- STEP 9: Update tax on advice based on the newly approved attendance
 			select uspupdatetaonadvice	(p_customeraccountid =>p_customeraccountid,p_month=>v_month,p_year=>v_year,
 						 p_geofenceid=>0,p_emp_code =>v_emp_code,
 						 p_createdby=>p_createdby,p_createdbyip=>p_createdbyip)
 			into v_rfcadvice;
+			
+			-- STEP 10: Pre-generate wages and calculate tax projection for the employee
 			select 	uspwagesfromattendance_pregenerate(
 						p_action =>'GenerateWages_pregenerate',
 						p_emp_code =>v_emp_code,
@@ -439,6 +463,7 @@ end if;
 	if p_action='SaveBulkAttendance' or  p_action='ApproveBulkAttendance' or p_action='LockAttendance'  then
 		select * from openappointments where emp_code=p_emp_code into v_openappointments;
 
+		-- STEP 1: Create or truncate temporary table to hold incoming bulk attendance data
 		if to_regclass('pg_temp.tmpbulkattendance') IS NULL then
 			create temporary table tmpbulkattendance 
 			(
@@ -452,6 +477,7 @@ end if;
 			truncate table tmpbulkattendance;
 		end if;
 
+		-- STEP 2: Create or truncate temporary table to track database operations (Inserted/Updated/Cleared)
 		if to_regclass('pg_temp.tmpresponse') IS NULL then		
 			create temporary table tmpresponse
 			(
@@ -463,6 +489,8 @@ end if;
 		end if;
 
 		select dateofjoining,dateofrelieveing from openappointments where emp_code=p_emp_code into v_doj,v_dateofrelieveing;
+		
+		-- STEP 3: Parse JSON payload and insert into temporary attendance table
 		insert into tmpbulkattendance
 		select * from json_populate_recordset(null::record, p_attendancedates::json)
 		as (
@@ -473,6 +501,7 @@ end if;
 				att_catagory text
 			);
 		/**************************************************************************/
+		-- STEP 4: Standardize leave categories based on system configurations
 		update tmpbulkattendance set leave_ctg=(select distinct leave_ctg 
 												from public.mst_tp_leavetype where status='1'
         										and is_enable='Y' 
@@ -505,6 +534,7 @@ end if;
 					end if;
 			*/
 			/*****************************Change 2.0 starts*****************************************************/
+			-- STEP 5: Calculate actual payroll start and end dates based on direction and custom settings
 			v_rec_payrolldates:=null;
 			select null::date start_dt,null::date end_dt into v_rec_payrolldates;
 			if coalesce(p_month_direction,'N')<>'N' then
@@ -532,10 +562,12 @@ end if;
 				v_rec_payrolldates.end_dt:=(make_date(v_year::int, v_month::int,1)+ interval '1 month -1 day')::date;
 			end if;
 
+			-- STEP 6: Reject operation if a multi-payout request is currently in progress
 			if EXISTS (SELECT * FROM tbl_monthlysalary where emp_code=p_emp_code and mprmonth=v_month and mpryear=v_year and is_rejected='0' and multipayoutrequestid<>0) then		
 				return 'Multi Payout already in process';
 			end if;
 			/*****************************Change 2.0 ends*****************************************************/					
+			-- STEP 7: Deactivate any old ledger entries to reset the processing state
 			update tbl_employeeledger set isactive='0'
 			where emp_code=p_emp_code and headid not in(173,174) -- change prod Ids
 			and processmonth=v_month
@@ -543,6 +575,7 @@ end if;
 			and isactive='1' and coalesce(isledgerdisbursed,'0')='0'; 
 
 			/*****************************Change 2.4 starts*****************************************************/		
+			-- STEP 8: Remove unlocked payment advice unless salary attendance has already been approved
 			DECLARE
 				v_calc_start date;
 				v_calc_end date;
@@ -573,6 +606,7 @@ end if;
 			if not exists(select * from cmsdownloadedwages where empcode::bigint=p_emp_code and mprmonth=v_month and mpryear=v_year and isactive='1' and cmsdownloadedwages.attendancemode NOT IN ('Ledger', 'Manual') and multipayoutrequestid=0) OR p_payout_with_attendance = 'P' then
 				-- 	if p_attendancesource ='bulkexcel' then
 				if p_att_purpose ='Salary' then
+					-- STEP 9: For 'Salary' purpose, deactivate existing attendance records for the provided dates
 					truncate table tmpresponse;
 					with tmp2 as (
 						update tbl_monthly_attendance
@@ -600,6 +634,7 @@ end if;
 				v_alertmsg:=coalesce(v_alertmsg,'')||coalesce(','||(select string_agg(att_date::text||' Marked '||tmpresponse.op,', ') from tmpresponse ),'');
 				v_alertmsg:=trim(v_alertmsg,',');
 				truncate table tmpresponse;
+				-- STEP 10: Insert new active attendance records mapped with holiday/weekly-off logic
 				with tmp3 as(
 					-- CHANGE [1.7]
 					INSERT INTO public.tbl_monthly_attendance(
@@ -631,6 +666,7 @@ end if;
 				v_alertmsg:=coalesce(v_alertmsg,'')||coalesce(','||(select string_agg(att_date::text||' Marked ',', ') from tmpresponse ),'');
 				v_alertmsg:=trim(v_alertmsg,',');
 			else
+				-- STEP 9 (Alternative): Clear specific existing leave records (CLS, CL)
 				with tmp2 as
 				(
 					update tbl_monthly_attendance
@@ -672,6 +708,7 @@ end if;
 
 					/********************************************************************/
 					truncate table tmpresponse;
+					-- STEP 10 (Alternative): Update existing attendance records with new bulk data
 					with tmp2 as
 					(
 						update tbl_monthly_attendance
@@ -706,6 +743,7 @@ end if;
 						v_alertmsg:=coalesce(v_alertmsg,'')||coalesce(','||(select string_agg(att_date::text||' Marked '||tmpresponse.op,', ') from tmpresponse ),'');
 						v_alertmsg:=trim(v_alertmsg,',');
 						truncate table tmpresponse;
+						-- STEP 11: Insert new attendance records for dates missing in the system
 						with tmp3 as(
 						-- CHANGE [1.7]
 						INSERT INTO public.tbl_monthly_attendance(
@@ -737,6 +775,7 @@ end if;
 				end if;	
 			end if;		
 		begin
+			-- STEP 12: Trigger user alerts if attendance is marked by an Employee directly
 			if p_marked_by_usertype='Employee' then
 				select emp_name,customeraccountid from openappointments where emp_code=p_emp_code  into v_emp_name,v_customeraccountid;
 				if (select count(*) from tmpresponse)=1 and (select att_date from tmpresponse)=current_date then
@@ -810,6 +849,7 @@ end;
 			--RAISE NOTICE 'v_year => %', v_year;
 
 			-- START - Change [2.1]
+				-- STEP 1: Check for any pending mis-punch validations before proceeding with approval
 				IF p_action='ApproveBulkAttendance' THEN
 					SELECT public.usp_manage_att_status_before_approval
 					(
@@ -828,6 +868,7 @@ end;
 				END IF;
 			-- END - Change [2.1]
 
+			-- STEP 2: Abort if payment advice is already locked
 			IF EXISTS (
 				SELECT DISTINCT emp_code
 				FROM paymentadvice
@@ -864,6 +905,7 @@ else
 		v_rec_payrolldates.end_dt:=(make_date(v_year::int, v_month::int,1)+ interval '1 month -1 day')::date;
 		--Raise Notice 'v_rec_payrolldates.start_dt=%,v_rec_payrolldates.end_dt=%',v_rec_payrolldates.start_dt,v_rec_payrolldates.end_dt;		
 end if;		
+			-- STEP 3: Abort if advance attendance is already marked for 'Attendance' purpose
 			IF EXISTS (
 				SELECT DISTINCT emp_code
 				FROM tbl_monthly_attendance
@@ -877,6 +919,7 @@ end if;
 				RETURN 'Advance attendance already exists.';
 			END IF;
 /*****************************Change 2.0 ends*****************************************************/	
+			-- STEP 4: Update matching attendance records to Approved ('A')
 			with tmp2 as
 			(
 				update tbl_monthly_attendance
@@ -923,6 +966,7 @@ end if;
 			--end;
 	/*************Change 1.2 ends*********************/	
 	/*************Change 1.3 starts*********************/		/*****************Change 1.13 starts*************/		
+		-- STEP 5: Apply late coming and early going fines to the employee ledger (if applicable)
 		if not EXISTS
 		(
 		SELECT 1
@@ -1039,9 +1083,11 @@ RAISE NOTICE 'post Payment  Advice block';
 	if p_action='PaySalary' then		
 		begin
 
+		-- STEP 1: Parse Year and Month from the incoming JSON payload
 		select (p_attendancedates::jsonb ->> 'Year')::int ,(p_attendancedates::jsonb ->> 'Month')::int limit 1
 		into v_year,v_month;
 
+		-- STEP 2: Iterate through active employees assigned to the account
 		for v_emp_code in(select oa.emp_code
 					  		from tbl_account ta inner join openappointments oa 
 							on oa.customeraccountid = ta.id 
@@ -1052,8 +1098,10 @@ RAISE NOTICE 'post Payment  Advice block';
 							and (oa.dateofrelieveing is null or oa.dateofrelieveing>=make_date (v_year,v_month,1))
 					) loop
 
+			-- STEP 3: Convert attendance records into final wages
 			if exists(select tm.* from tbl_monthwise_flexi_attendance tm where tm.emp_code=v_emp_code
 							and tm.attendancemonth=v_month	and tm.attendanceyear=v_year and tm.isactive='1') then
+				-- Process flexi attendance to wages
 				select public.uspcreatewagesfromflexiattendance(
 						p_action =>'MoveAttendanceToWages',
 						p_emp_code =>v_emp_code,
@@ -1065,6 +1113,7 @@ RAISE NOTICE 'post Payment  Advice block';
 				msg:=msg||coalesce(v_tempmgs,'');
 				raise notice '%',v_tempmgs;
 			else
+				-- Clean up old payment advice and process standard attendance to wages
 				delete from paymentadvice where emp_code=v_emp_code and mprmonth=v_month and mpryear=v_year; /******change 1.3********/
 				select public.uspcreatewagesfromattendance(
 						p_action =>'MoveAttendanceToWages',
@@ -1099,6 +1148,7 @@ RAISE NOTICE 'post Payment  Advice block';
 	-- ==========================================================================================
 	if p_action='ApproveDailyAttendance' then
 			
+		-- STEP 1: Determine payroll date ranges and boundaries
 		v_month=p_month;
 				v_year:=p_year;
 				select * from openappointments where emp_code=p_emp_code into v_openappointments;
@@ -1119,6 +1169,7 @@ RAISE NOTICE 'post Payment  Advice block';
 				into v_rec_payrolldates;
 			end if;		
 				
+		-- STEP 2: Prepare temporary tables for incoming daily attendance data
 		if to_regclass('pg_temp.tmpbulkattendance') IS NULL then
 																							  
 			 
@@ -1145,9 +1196,11 @@ RAISE NOTICE 'post Payment  Advice block';
 			truncate table tmpresponse;
 		end if;
 		
+				-- STEP 3: Parse JSON payload to extract daily attendance records
 				insert into tmpbulkattendance
 				select * from json_populate_recordset(null::type_attendancedates_business, p_attendancedates::json);
 
+			-- STEP 4: Prevent daily approval if a single full-month payout already exists
 			IF EXISTS (
 						SELECT DISTINCT emp_code
 						FROM paymentadvice
@@ -1174,8 +1227,10 @@ RAISE NOTICE 'post Payment  Advice block';
 				RETURN 'Single Payout Already exists.';
 			END IF;
 /*****************************Change 2.0 ends*****************************************************/	
+		-- STEP 5: Generate a unique ID for the multi-payout request
 		v_multipayoutrequestid:=nextval('seq_multipayoutrequest'::regclass);
 
+			-- STEP 6: Update specific daily attendance records to Approved ('A') under Multi-Payout ('MAP')
 			with tmp2 as
 			(
 				update tbl_monthly_attendance
@@ -1224,6 +1279,7 @@ RAISE NOTICE 'post Payment  Advice block';
 		) then
 	/**************************1.8 ends***********************************************/			
 		/*****************Change 1.13 ends*************/
+			-- STEP 7: Pre-generate wages and tax calculations for the approved daily dates
 			select 	uspwagesfromattendance_pregenerate(
 						p_action =>'GenerateWages_pregenerate',
 						p_emp_code =>p_emp_code,
@@ -1243,6 +1299,7 @@ RAISE NOTICE 'post Payment  Advice block';
 						Raise Notice 'v_recadvice.mprmonth=%,>v_recadvice.mpryear=%,p_createdbyip=%,v_paymentadvice.emp_code=%',v_recadvice.mprmonth,v_recadvice.mpryear,p_createdbyip,v_recadvice.emp_code;
 						Raise Notice 'v_multipayoutrequestid=%',v_multipayoutrequestid;
 
+						-- STEP 8: Finalize the payout by moving advice data to formal payment records
 						call public.uspcreatepayoutfromadvice
 							(
 								p_action =>'MoveAttendanceToWages',
@@ -1255,6 +1312,7 @@ RAISE NOTICE 'post Payment  Advice block';
 								p_paymentadvice=>v_recadvice,
 								p_multipayoutrequestid=>v_multipayoutrequestid
 							);
+						-- Clean up temporary advice data linked to this multi-payout request
 						delete from paymentadvice where multipayoutrequestid=v_multipayoutrequestid;
 
 						end if;	
