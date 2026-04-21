@@ -33,6 +33,7 @@ S.No. 	Date			Remarks 											Done By
 2.3 	14-APR-2026		For JIVO Account add in rate gross for 
 						ratetravelling_allowance and ratetransport_allowance Vinod Kumar
 2.4 	21-APR-2026		Fix duplicate cursor OPEN for v_view_salary_slip = 'Y'		Antigravity
+2.5 	21-APR-2026		For account 10041 add in rate gross for ratechildren_education_allowance and ratetravelling_allowance Antigravity
 *************************************************************************************************************/
 declare
 	v_rfcsalary refcursor;
@@ -390,7 +391,10 @@ round(sum(coalesce(basic,0))) basic,
 round(sum(coalesce(hra,0))) hra,
 round(sum(coalesce(specialallowance,0))) allowance,
 round(max(tmprate.fixedallowancestotalrate) + case when v_customeraccountid=2719 
-	then coalesce(max(tmprate.ratetransport_allowance),0) + coalesce(max(tmprate.ratetravelling_allowance),0) else 0 end)
+	then coalesce(max(tmprate.ratetransport_allowance),0) + coalesce(max(tmprate.ratetravelling_allowance),0) 
+	when v_customeraccountid=10041 
+	then coalesce(max(tmprate.ratechildren_education_allowance),0) + coalesce(max(tmprate.ratetravelling_allowance),0) 
+	else 0 end)
 	rategross,
 round((coalesce(sum(epf),0))::numeric(18,2)) pf,
 round(sum(coalesce(esi,0))) employeeesirate,
