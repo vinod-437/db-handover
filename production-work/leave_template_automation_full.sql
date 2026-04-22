@@ -194,7 +194,7 @@ BEGIN
         AND emp.isactive = '1'
         AND emp.appointment_status_id <> '13' -- Ensure active
         AND b.account_id = ANY(v_allowed_accounts)
-        AND CURRENT_DATE >= (emp.dateofjoining + (COALESCE(a.probation_prd_months, '0')::INT || ' days')::interval);
+        AND (CURRENT_DATE - emp.dateofjoining::DATE) = (COALESCE(a.probation_prd_months, '0')::INT + 1);
 
     -- STEP 2: Process in Chunks
     LOOP
