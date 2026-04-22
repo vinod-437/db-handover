@@ -253,3 +253,11 @@ EXCEPTION WHEN OTHERS THEN
     ROLLBACK;
 END;
 $$;
+
+
+-- schedule every night at 16:30 UTC (10:00 PM IST)
+SELECT cron.schedule(
+  job_name := 'nightly_probation_template_upgrade', 
+  schedule := '30 16 * * *',                        
+  command  := 'CALL public.usp_auto_upgrade_probation_templates();'
+);
