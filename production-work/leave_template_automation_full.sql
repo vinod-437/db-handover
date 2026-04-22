@@ -156,6 +156,9 @@ CREATE OR REPLACE PROCEDURE public.usp_auto_upgrade_probation_templates()
 LANGUAGE plpgsql
 AS $$
 DECLARE
+    -- Hardcode your specific account IDs here:
+    v_allowed_accounts BIGINT[] := ARRAY[653, 981];
+    
     r_employee RECORD;
     v_target_template_txt JSONB;
     v_batch_count INT;
@@ -190,13 +193,13 @@ BEGIN
         AND b.effective_to IS NULL
         AND emp.isactive = '1'
         AND emp.appointment_status_id <> '13' -- Ensure active
+        AND b.account_id = ANY(v_allowed_accounts)
         AND CURRENT_DATE >= (emp.dateofjoining + (COALESCE(a.probation_prd_months, '0')::INT || ' days')::interval);
 
     -- STEP 2: Process in Chunks
     LOOP
         v_batch_count := 0;
 
-        -- Only grab 100 unprocessed records at a time
         FOR r_employee IN (
             SELECT * FROM tmp_prob_upgrade_batch WHERE processed = FALSE LIMIT 100
         ) LOOP
@@ -209,18 +212,53 @@ BEGIN
             LIMIT 1;
 
             IF v_target_template_txt IS NOT NULL THEN
-                -- STEP 3: Change the template
-                CALL public.usp_process_employee_leave_template(
-                    p_account_id => r_employee.account_id::VARCHAR,
-                    p_emp_id => r_employee.emp_id::VARCHAR,
-                    p_template_id => r_employee.target_template_id::VARCHAR,
-                    p_user_ip => 'SYSTEM_AUTO',
-                    p_user_by => 'SYSTEM_BATCH',
-                    p_leave_template_json => v_target_template_txt,
-                    p_effective_date => to_char(CURRENT_DATE, 'dd-mm-yyyy')
-                );
+                -- Ensure the template text is a JSON array (fixes "cannot call jsonb_populate_recordset on a non-array")
+                IF jsonb_typeof(v_target_template_txt) = 'object' THEN
+                    v_target_template_txt := jsonb_build_array(v_target_template_txt);
+                END IF;
+
+                -- STEP 3: Change the template using a subtransaction block
+                -- This implicitly sets a savepoint. If an error occurs, it rolls back this employee's changes only.
+                DECLARE
+                    v_response JSON;
+                BEGIN
+                    -- Call the core API function directly
+                    SELECT public.usp_apply_employee_leave_template(
+                        r_employee.account_id::VARCHAR,
+                        r_employee.emp_id::VARCHAR,
+                        r_employee.target_template_id::VARCHAR,
+                        'SYSTEM_AUTO',
+                        'SYSTEM_BATCH',
+                        v_target_template_txt,
+                        to_char(CURRENT_DATE, 'dd-mm-yyyy')
+                    ) INTO v_response;
+                    
+                    IF v_response->>'msgcd' = '1' THEN
+                        -- Success!
+                        v_total_processed := v_total_processed + 1;
+                        
+                        INSERT INTO public.tbl_employee_leave_template_log (
+                            emp_id, account_id, template_id, request_json, response_message, status, error_message, created_by, user_ip
+                        ) VALUES (
+                            r_employee.emp_id::VARCHAR, r_employee.account_id::VARCHAR, r_employee.target_template_id::VARCHAR, 
+                            v_target_template_txt, v_response->>'msg', 'SUCCESS', NULL, 'SYSTEM_BATCH', 'SYSTEM_AUTO'
+                        );
+                    ELSE
+                        -- Logical failure: Raise exception to trigger rollback of this specific employee's transaction
+                        RAISE EXCEPTION 'Logical Failure: %', v_response->>'msg';
+                    END IF;
+
+                EXCEPTION WHEN OTHERS THEN
+                    -- The database automatically rolled back this employee's changes!
+                    -- Now we log the failure and continue to the next employee.
+                    INSERT INTO public.tbl_employee_leave_template_log (
+                        emp_id, account_id, template_id, request_json, response_message, status, error_message, created_by, user_ip
+                    ) VALUES (
+                        r_employee.emp_id::VARCHAR, r_employee.account_id::VARCHAR, r_employee.target_template_id::VARCHAR, 
+                        v_target_template_txt, 'Transaction Failed', 'FAILED', SQLERRM, 'SYSTEM_BATCH', 'SYSTEM_AUTO'
+                    );
+                END;
                 
-                v_total_processed := v_total_processed + 1;
             ELSE
                 -- Log a failure if target template missing
                 INSERT INTO public.tbl_employee_leave_template_log (
@@ -248,9 +286,8 @@ BEGIN
     
     RAISE NOTICE 'Total employees upgraded from probation templates: %', v_total_processed;
 
-EXCEPTION WHEN OTHERS THEN
-    RAISE NOTICE 'Batch process failed: %', SQLERRM;
-    ROLLBACK;
+    -- Notice: We do NOT use an outer EXCEPTION block here, because PostgreSQL 
+    -- does not allow COMMITs inside a block that has an EXCEPTION handler!
 END;
 $$;
 
