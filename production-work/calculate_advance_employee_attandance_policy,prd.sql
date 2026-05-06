@@ -18,6 +18,7 @@ Version	|	Date		|	Done_By			|	Changes
 1.1		|	25-Dec-2025	|	Parveen Kumar	|	Half-Day, Leave Deduction in Monthly Hours.
 1.2		|	25-Dec-2025	|	Parveen Kumar	|	Working Hours Calculation (Check In) from Start Time.
 1.3		|	07-Jan-2026	|	Parveen Kumar	|	Add penalty_mode (strict/lenient) changes in Penalty Policy.
+1.5		|	17-Apr-2026	|	Harsh			|	Working Hours calculation for Hourly employee when OT is bypassed.
 **************************************************************************************************/
 DECLARE
 	response refcursor;
@@ -216,7 +217,9 @@ DECLARE
 	v_leave_grace_used INT;
 
 	v_tmp_penalty_rules record;
+	-- START - Fix 'record not assigned' error
 	v_penalty_rule_found boolean := false;
+	-- END - Fix 'record not assigned' error
 	v_is_working_hrs_completed CHARACTER VARYING(1) := 'N';
 
 	v_days int;
@@ -277,6 +280,7 @@ BEGIN
 
 		SELECT * FROM vw_shifts_emp_wise WHERE emp_code::bigint = p_emp_code AND is_active='1' INTO v_assigned_shift_details; -- This is used for Highflow Client for Overtime Calculations
 
+									  
 		IF p_customeraccountid IN (7158, 7196, 7197) THEN -- Agro Client
 			IF EXISTS(SELECT 1 FROM tbl_attendance WHERE emp_code = p_emp_code AND att_date = v_att_date AND isactive = '1') THEN
 				SELECT check_in_time::TIMESTAMP
@@ -325,7 +329,8 @@ BEGIN
 			ELSE
 				(check_in_out_data.check_in_out_details->0->>'actual_check_in_time')::timestamp
 			END AS actual_check_in_time_as_per_shift,
-			CASE WHEN emp_spec.total_working_hours_calculation = 'first_last_check' THEN
+			--CASE WHEN emp_spec.total_working_hours_calculation = 'first_last_check' THEN harsh
+			CASE WHEN emp_spec.total_working_hours_calculation IN ('first_last_check', 'first_last_mark_time') THEN
 				COALESCE(NULLIF(check_in_out_data.check_in_out_details->(json_array_length(check_in_out_data.check_in_out_details) - 1)->>'actual_check_out_time', ''), check_in_out_data.check_in_out_details->(json_array_length(check_in_out_data.check_in_out_details) - 1)->>'actual_check_in_time')::timestamp
 			WHEN json_array_length(check_in_out_data.check_in_out_details) > 1 AND check_in_out_data.check_in_out_details->(json_array_length(check_in_out_data.check_in_out_details) - 1)->>'actual_check_out_time' IS NULL THEN
 				(check_in_out_data.check_in_out_details->(json_array_length(check_in_out_data.check_in_out_details) - 2)->>'actual_check_out_time')::timestamp
@@ -381,6 +386,7 @@ BEGIN
 		v_no_of_minutes_worked := CEIL(EXTRACT(EPOCH FROM v_no_of_hours_worked::INTERVAL)/60);
 	-- END - Get Check-In/Out Time and Total No of Hours Worked
 
+																						  
 	-- 22 [Late Coming], 21 [Early Going] - Setting in mst_candidates_policies
 	IF v_LC_EG_enabled_in_app_setting = 'app-setting' THEN
 		SELECT COALESCE(policy_status, 'N') INTO v_EG_enabled_in_app_setting
@@ -572,6 +578,8 @@ BEGIN
 			IF COALESCE(v_shift_details.is_max_hours_required, 'N') = 'Y' THEN
 				v_per_day_max_minutes := EXTRACT(EPOCH FROM COALESCE(NULLIF(v_shift_details.max_hours_per_day_time, ''), '00:00:00')::INTERVAL)/60;
 			END IF;
+			RAISE NOTICE 'v_per_day_min_minutes :: %', v_per_day_min_minutes;
+			RAISE NOTICE 'v_per_day_max_minutes :: %', v_per_day_max_minutes;
 
 			v_attandance_type := 'PP';
 		END IF;
@@ -585,6 +593,16 @@ BEGIN
 		END IF;
 
 		v_overtime := (CASE WHEN v_ot_rules IS NOT NULL THEN 'Y' ELSE 'N' END);
+
+		-- START - Change [1.5] - 17-Apr-2026 - Harsh
+		-- Fix For Hourly Setup Working Hours: Pre-assign the standard working minutes in case Overtime is bypassed. 
+		-- This guarantees hourly exact working hours and standard rounding carry over.
+		-- AANURAJ FASTENERS PRIVATE LIMITED
+		IF v_ishourlysetup = 'Y' AND p_customeraccountid in (8428) THEN
+			v_rounded_no_of_minutes_worked := v_no_of_minutes_worked;
+		END IF;
+		-- END - Change [1.5] - 17-Apr-2026 - Harsh
+
 		IF v_overtime = 'Y' THEN
 		    SELECT t.wo_ho_type::TEXT INTO v_wo_ho_type
 		    FROM public.usp_get_weekly_off_n_holiday_dates(
@@ -817,7 +835,31 @@ BEGIN
 					to_char(v_overtime_final_amount,'FM999999990.00')
 				);
 			END IF;
+		-- ELSE
+		-- 	RAISE NOTICE 'overtime [NO] block';
+		-- 	v_rounded_check_in := DATE_TRUNC('hour', (v_first_check_in_time + INTERVAL '5 HOURS 30 MINUTES')) +
+		-- 		CASE
+		-- 			WHEN EXTRACT(MINUTE FROM (v_first_check_in_time + INTERVAL '5 HOURS 30 MINUTES')) < 15 THEN INTERVAL '0 minutes'
+		-- 			WHEN EXTRACT(MINUTE FROM (v_first_check_in_time + INTERVAL '5 HOURS 30 MINUTES')) < 30 THEN INTERVAL '30 minutes'
+		-- 			ELSE INTERVAL '1 hour'
+		-- 		END;
+				
+		-- 	v_rounded_check_out := DATE_TRUNC('hour', (v_last_check_out_time + INTERVAL '5 HOURS 30 MINUTES')) +
+		-- 		CASE
+		-- 			WHEN EXTRACT(MINUTE FROM (v_last_check_out_time + INTERVAL '5 HOURS 30 MINUTES')) < 15 THEN INTERVAL '0 minutes'
+		-- 			WHEN EXTRACT(MINUTE FROM (v_last_check_out_time + INTERVAL '5 HOURS 30 MINUTES')) < 59 THEN INTERVAL '30 minutes'
+		-- 			ELSE INTERVAL '1 hour'
+		-- 		END;
+				
+		-- 	v_rounded_no_of_hours_worked := 
+		-- 		LPAD(FLOOR(EXTRACT(EPOCH FROM (v_rounded_check_out - v_rounded_check_in)) / 3600)::TEXT, 2, '0') || ':' ||
+		-- 		LPAD(FLOOR((EXTRACT(EPOCH FROM (v_rounded_check_out - v_rounded_check_in)) % 3600) / 60)::TEXT, 2, '0') || ':' ||
+		-- 		LPAD(FLOOR((EXTRACT(EPOCH FROM (v_rounded_check_out - v_rounded_check_in)) % 60))::TEXT, 2, '0');
+
+		-- 	v_rounded_no_of_minutes_worked := EXTRACT(EPOCH FROM (v_rounded_no_of_hours_worked::INTERVAL - v_assigned_total_break_unpaid))/60;
 		END IF;
+		RAISE NOTICE 'v_rounded_no_of_hours_worked :: %', v_rounded_no_of_hours_worked;
+		RAISE NOTICE 'v_rounded_no_of_minutes_worked :: %', v_rounded_no_of_minutes_worked;
 	-- END - Overtime Calculations
 
 	-- START - Leave Details (As Discussed with Yatin Sir and Chander Mohan Sir)
@@ -1145,9 +1187,13 @@ BEGIN
 									SELECT * INTO v_tmp_penalty_rules
 									FROM tmp_penalty_rules
 									WHERE v_deviation_in_checkin_time_in_minutes BETWEEN start_time AND end_time ORDER BY start_time ASC LIMIT 1;
+									-- START - Fix 'record not assigned' error
 									v_penalty_rule_found := FOUND;
+									-- END - Fix 'record not assigned' error
 
+									-- START - Fix 'record not assigned' error
 									IF v_penalty_rule_found THEN
+									-- END - Fix 'record not assigned' error
 									SELECT att_date INTO v_last_penalty_date
 									FROM tbl_monthly_attendance tma
 									WHERE
@@ -1187,7 +1233,9 @@ BEGIN
 										WHERE v_deviation_in_checkin_time_in_minutes BETWEEN start_time AND end_time ORDER BY start_time ASC LIMIT 1;
 									END IF;
 									-- END - Change [1.4] - Multiple Occurrence Penalty Deduction
+									-- START - Fix 'record not assigned' error
 									END IF;
+									-- END - Fix 'record not assigned' error
 								ELSE
 									SELECT att_date INTO v_last_penalty_date
 									FROM tbl_monthly_attendance tma
@@ -1200,7 +1248,9 @@ BEGIN
 										WHERE v_deviation_in_checkin_time_in_minutes BETWEEN start_time AND end_time ORDER BY start_time ASC LIMIT 1;
 										v_penalty_rule_found := FOUND;
 
+										-- START - Fix 'record not assigned' error
 										IF v_penalty_rule_found THEN
+										-- END - Fix 'record not assigned' error
 
 										-- START - Change [1.4] - Multiple Occurrence Penalty Deduction
 										IF v_tmp_penalty_rules.max_uses_mode = 'deviation_multiples_after' OR v_tmp_penalty_rules.max_uses_mode = 'deviation_multiples_of_every' THEN
@@ -1228,18 +1278,26 @@ BEGIN
 											v_tmp_penalty_rules.used_deviations := v_emp_deviations;
 										END IF;
 										-- END - Change [1.4] - Multiple Occurrence Penalty Deduction
+										-- START - Fix 'record not assigned' error
 										END IF;
+										-- END - Fix 'record not assigned' error
 									ELSE
 										SELECT * INTO v_tmp_penalty_rules FROM tmp_penalty_rules WHERE max_uses = -1 LIMIT 1;
+										-- START - Fix 'record not assigned' error
 										v_penalty_rule_found := FOUND;
+										-- END - Fix 'record not assigned' error
 									END IF;
 								END IF;
 
+								-- START - Fix 'record not assigned' error
+								-- START - Fix 'record not assigned' error
 								IF v_penalty_rule_found AND v_tmp_penalty_rules.exempt_deviation_after_working_hrs_completed = true THEN
+								-- END - Fix 'record not assigned' error
 									v_is_working_hrs_completed = (CASE WHEN v_no_of_minutes_worked >= v_shift_working_minutes THEN 'Y' ELSE 'N' END);
 								END IF;
 
 								IF v_penalty_rule_found AND (v_deviation_in_checkin_time_in_minutes > v_grace_period_in_minutes OR COALESCE(v_tmp_penalty_rules.used_deviations, 0) > COALESCE(v_tmp_penalty_rules.max_uses, 0)) AND v_is_working_hrs_completed = 'N' THEN
+								-- END - Fix 'record not assigned' error
 									IF v_overtime = 'Y' AND v_penalty_as_ot_config_deduction_enabled = 'Y' THEN
 										IF LOWER(v_ot_rules_rate_structure->>'ot_trigger_status') = 'true' THEN
 											IF EXISTS (
@@ -1325,13 +1383,22 @@ BEGIN
 											ELSIF v_penalty_as_leave_deduction = 0.5 THEN
 												v_attandance_type := 'HD';
 											END IF;
-											v_attandance_leave_type := 'AA';
-											IF v_penalty_as_leave_deduction_priority IS NOT NULL THEN
-												IF EXISTS(SELECT * FROM tmp_candidate_leave_balance WHERE UPPER(typecode) = UPPER(v_penalty_as_leave_deduction_priority::jsonb -> 0 ->> 'leavetypecode') AND prev_bal > 0) THEN
-													IF UPPER(v_penalty_as_leave_deduction_priority::jsonb -> 0 ->> 'leave_ctg') = 'PAID' THEN
-														v_attandance_leave_type := UPPER(v_penalty_as_leave_deduction_priority::jsonb -> 0 ->> 'leavetypecode');
-													END IF;
+
+											FOR v_leave IN SELECT jsonb_array_elements(v_penalty_as_leave_deduction_priority) LOOP
+												IF v_attandance_type = 'AA' THEN
+													SELECT b.typecode INTO v_attandance_leave_type
+													FROM tmp_candidate_leave_balance b
+													WHERE UPPER(b.typecode) = UPPER(v_leave->>'leavetypecode') AND b.prev_bal > 0.5 LIMIT 1;
+												ELSE
+													SELECT b.typecode INTO v_attandance_leave_type
+													FROM tmp_candidate_leave_balance b
+													WHERE UPPER(b.typecode) = UPPER(v_leave->>'leavetypecode') AND b.prev_bal > 0 LIMIT 1;
 												END IF;
+												IF v_attandance_leave_type IS NOT NULL THEN EXIT; END IF;
+											END LOOP;
+											v_attandance_leave_type := COALESCE(NULLIF(v_attandance_leave_type, ''), 'AA');
+											IF v_penalty_as_leave_deduction = 1.0 AND v_attandance_leave_type <> 'AA' THEN
+												v_attandance_type := 'LL';
 											END IF;
 										END IF;
 									-- END - Leave Deduction Penalty
@@ -1377,11 +1444,13 @@ BEGIN
 										v_penality_on_checkin_msg := ('Penalty on '||COALESCE(v_deviation_in_checkin_time_in_minutes, 0)||' Minutes Late '||COALESCE(v_deviation_type, '')||' in '||v_penalty_mode||' mode not applied because, before '|| p_att_date ||', the deviations occurred only '||COALESCE(v_emp_deviations, 0)||' times.The penalty will be applied after '||COALESCE(v_tmp_penalty_rules.max_uses, 0)||' occurrence.');
 									END IF;
 								ELSE
+									-- START - Fix 'record not assigned' error
 									IF NOT v_penalty_rule_found THEN
 										v_penality_on_checkin_msg := ('Penalty on '||COALESCE(v_deviation_in_checkin_time_in_minutes, 0)||' Minutes Late '||COALESCE(v_deviation_type, '')||' in '||v_penalty_mode||' mode not applied because no matching penalty rule was found.');
 									ELSE
 										v_penality_on_checkin_msg := ('Penalty on '||COALESCE(v_deviation_in_checkin_time_in_minutes, 0)||' Minutes Late '||COALESCE(v_deviation_type, '')||' in '||v_penalty_mode||' mode not applied because, before '|| p_att_date ||', the deviations occurred only '||COALESCE(v_emp_deviations, 0)||' times.The penalty will be applied after '||COALESCE(v_tmp_penalty_rules.max_uses, 0)||' occurrence.');
 									END IF;
+									-- END - Fix 'record not assigned' error
 								END IF;
 							END IF;
 						END IF;
@@ -1397,9 +1466,13 @@ BEGIN
 									SELECT * INTO v_tmp_penalty_rules
 									FROM tmp_penalty_rules
 									WHERE v_deviation_in_checkout_time_in_minutes BETWEEN start_time AND end_time ORDER BY start_time ASC LIMIT 1;
+									-- START - Fix 'record not assigned' error
 									v_penalty_rule_found := FOUND;
+									-- END - Fix 'record not assigned' error
 
+									-- START - Fix 'record not assigned' error
 									IF v_penalty_rule_found THEN
+									-- END - Fix 'record not assigned' error
 									SELECT att_date INTO v_last_penalty_date
 									FROM tbl_monthly_attendance tma
 									WHERE tma.isactive = '1' AND tma.emp_code = p_emp_code AND tma.att_date < v_att_date AND tma.deviation_in_checkout = '1'
@@ -1426,7 +1499,9 @@ BEGIN
 										-- v_tmp_penalty_rules.used_deviations := v_emp_deviations;
 									END IF;
 									-- END - Change [1.4] - Multiple Occurrence Penalty Deduction
+									-- START - Fix 'record not assigned' error
 									END IF;
+									-- END - Fix 'record not assigned' error
 								ELSE
 									SELECT att_date INTO v_last_penalty_date
 									FROM tbl_monthly_attendance tma
@@ -1439,7 +1514,9 @@ BEGIN
 										WHERE v_deviation_in_checkout_time_in_minutes BETWEEN start_time AND end_time ORDER BY start_time ASC LIMIT 1;
 										v_penalty_rule_found := FOUND;
 
+										-- START - Fix 'record not assigned' error
 										IF v_penalty_rule_found THEN
+										-- END - Fix 'record not assigned' error
 
 										-- START - Change [1.4] - Multiple Occurrence Penalty Deduction
 										IF v_tmp_penalty_rules.max_uses_mode = 'deviation_multiples_after' THEN
@@ -1464,10 +1541,14 @@ BEGIN
 										v_penalty_rule_found := FOUND;
 									END IF;
 								END IF;
+								-- START - Fix 'record not assigned' error
 								IF v_penalty_rule_found AND v_tmp_penalty_rules.exempt_deviation_after_working_hrs_completed = true THEN
+								-- END - Fix 'record not assigned' error
 									v_is_working_hrs_completed = (CASE WHEN v_no_of_minutes_worked >= v_shift_working_minutes THEN 'Y' ELSE 'N' END);
 								END IF;
+								-- START - Fix 'record not assigned' error
 								IF v_penalty_rule_found AND ((EXTRACT(EPOCH FROM v_shift_end_timing::TIMESTAMP - v_last_check_out_time::TIMESTAMP) / 60) > v_grace_period_in_minutes OR v_tmp_penalty_rules.used_deviations > v_tmp_penalty_rules.max_uses) AND v_is_working_hrs_completed = 'N' THEN
+								-- END - Fix 'record not assigned' error
 									IF v_overtime = 'Y' AND v_penalty_as_ot_config_deduction_enabled = 'Y' THEN
 										IF LOWER(v_ot_rules_rate_structure->>'ot_trigger_status') = 'true' THEN
 											IF EXISTS (
@@ -1546,18 +1627,28 @@ BEGIN
 										IF v_penalty_as_leave_deduction_enabled = 'Y' AND COALESCE(v_leave_grace_used, 0) > COALESCE(v_leave_grace_max_uses, 0) THEN
 											v_penalty_as_leave_deduction := (SELECT leave_deduction FROM tmp_leave_penalty_rules WHERE v_deviation_in_checkin_time_in_minutes > start_time AND v_deviation_in_checkin_time_in_minutes <= end_time);
 											v_penalty_as_leave_deduction_priority := (SELECT leave_priority FROM tmp_leave_penalty_rules WHERE v_deviation_in_checkin_time_in_minutes > start_time AND v_deviation_in_checkin_time_in_minutes <= end_time);
+											v_attandance_leave_type := 'AA';
 											IF v_penalty_as_leave_deduction = 1.0 THEN
 												v_attandance_type := 'AA';
 											ELSIF v_penalty_as_leave_deduction = 0.5 THEN
 												v_attandance_type := 'HD';
 											END IF;
-											v_attandance_leave_type := 'AA';
-											IF v_penalty_as_leave_deduction_priority IS NOT NULL THEN
-												IF EXISTS(SELECT * FROM tmp_candidate_leave_balance WHERE UPPER(typecode) = UPPER(v_penalty_as_leave_deduction_priority::jsonb -> 0 ->> 'leavetypecode') AND prev_bal > 0) THEN
-													IF UPPER(v_penalty_as_leave_deduction_priority::jsonb -> 0 ->> 'leave_ctg') = 'PAID' THEN
-														v_attandance_leave_type := UPPER(v_penalty_as_leave_deduction_priority::jsonb -> 0 ->> 'leavetypecode');
-													END IF;
+
+											FOR v_leave IN SELECT jsonb_array_elements(v_penalty_as_leave_deduction_priority) LOOP
+												IF v_attandance_type = 'AA' THEN
+													SELECT b.typecode INTO v_attandance_leave_type
+													FROM tmp_candidate_leave_balance b
+													WHERE UPPER(b.typecode) = UPPER(v_leave->>'leavetypecode') AND b.prev_bal > 0.5 LIMIT 1;
+												ELSE
+													SELECT b.typecode INTO v_attandance_leave_type
+													FROM tmp_candidate_leave_balance b
+													WHERE UPPER(b.typecode) = UPPER(v_leave->>'leavetypecode') AND b.prev_bal > 0 LIMIT 1;
 												END IF;
+												IF v_attandance_leave_type IS NOT NULL THEN EXIT; END IF;
+											END LOOP;
+											v_attandance_leave_type := COALESCE(NULLIF(v_attandance_leave_type, ''), 'AA');
+											IF v_penalty_as_leave_deduction = 1.0 AND v_attandance_leave_type <> 'AA' THEN
+												v_attandance_type := 'LL';
 											END IF;
 										END IF;
 									-- END - Leave Deduction Penalty
@@ -1680,7 +1771,15 @@ BEGIN
 								v_attandance_leave_type := 'AA';
 								IF v_penalty_as_leave_deduction_priority IS NOT NULL THEN
 								    FOR v_leave IN SELECT jsonb_array_elements(v_penalty_as_leave_deduction_priority) LOOP
-								        SELECT b.typecode INTO v_attandance_leave_type FROM tmp_candidate_leave_balance b WHERE UPPER(b.typecode) = UPPER(v_leave->>'leavetypecode') AND b.prev_bal > 0 LIMIT 1;
+										IF v_attandance_type = 'AA' THEN
+									        SELECT b.typecode INTO v_attandance_leave_type
+											FROM tmp_candidate_leave_balance b
+											WHERE UPPER(b.typecode) = UPPER(v_leave->>'leavetypecode') AND b.prev_bal > 0.5 LIMIT 1;
+										ELSE
+									        SELECT b.typecode INTO v_attandance_leave_type
+											FROM tmp_candidate_leave_balance b
+											WHERE UPPER(b.typecode) = UPPER(v_leave->>'leavetypecode') AND b.prev_bal > 0 LIMIT 1;
+										END IF;
 										IF v_attandance_leave_type IS NOT NULL THEN EXIT; END IF;
 								    END LOOP;
 									v_attandance_leave_type := COALESCE(NULLIF(v_attandance_leave_type, ''), 'AA');
@@ -1696,8 +1795,11 @@ BEGIN
 			END IF;
 		END IF;
 	-- END - Grace Policy Changes
+	
+	
+	RAISE NOTICE 'v_attandance_leave_type :: %', v_attandance_leave_type;
 
-	IF v_deviation_in_checkout = 1 AND v_deviation_in_checkin = 1 THEN
+	/* IF v_deviation_in_checkout = 1 AND v_deviation_in_checkin = 1 THEN
 		v_attandance_category := 'LCEG';
 	ELSIF v_deviation_in_checkin = 1 THEN
 		v_attandance_category := 'LC';
@@ -1707,10 +1809,29 @@ BEGIN
 	ELSIF v_deviation_in_checkout = 1 THEN
 		v_attandance_category := 'EG';
 	END IF;
+	*/
+	-- added by harsh dated. dated. 23.04.2026
+	IF v_last_check_out_time IS NULL OR COALESCE(v_last_check_out_time::TEXT, '') = '' OR v_first_check_in_time = v_last_check_out_time THEN
+        IF v_deviation_in_checkin = 1 THEN
+            v_attandance_category := 'MPLC';
+        ELSE
+            v_attandance_category := 'MP';
+        END IF;
+    ELSIF v_deviation_in_checkout = 1 AND v_deviation_in_checkin = 1 THEN
+        v_attandance_category := 'LCEG';
+    ELSIF v_deviation_in_checkin = 1 THEN
+        v_attandance_category := 'LC';
+    ELSIF v_deviation_in_checkout = 1 THEN
+        v_attandance_category := 'EG';
+    END IF;
+	
+-- end Harsh
 
 	IF v_deviation_in_checkin_time::INTERVAL > '00:00:00' OR v_deviation_in_checkout_time::INTERVAL > '00:00:00' THEN
-		v_fore_color := v_tmp_penalty_rules.fore_color;
-		v_background_color := v_tmp_penalty_rules.background_color;
+		IF v_penalty_rule_found THEN
+			v_fore_color := v_tmp_penalty_rules.fore_color;
+			v_background_color := v_tmp_penalty_rules.background_color;
+		END IF;
 	END IF;
 
 	-- START - Response

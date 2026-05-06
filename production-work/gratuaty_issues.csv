@@ -1,0 +1,193 @@
+"hrgeneratedon","netpay","attendancemode","id","mprmonth","mpryear","batchid","createdby","createdon","createdbyip","emp_code","subunit","dateofleaving","totalleavetaken","emp_name","post_offered","emp_address","email","mobilenum","pancard","gender","dateofbirth","fathername","residential_address","pfnumber","uannumber","lossofpay","paiddays","monthdays","ratebasic","ratehra","rateconv","ratemedical","ratespecialallowance","fixedallowancestotalrate","basic","hra","conv","medical","specialallowance","fixedallowancestotal","ratebasic_arr","ratehra_arr","rateconv_arr","ratemedical_arr","ratespecialallowance_arr","fixedallowancestotalrate_arr","incentive","refund","grossearning","epf","vpf","employeeesirate","tds","loan","lwf","insurance","mobile","advance","other","grossdeduction","netpay-2","ac_1","ac_10","ac_2","ac21","employeresirate","lwfcontr","ews","gratuity","recordtype","govt_bonus_opted","govt_bonus_amt","modifiedby","modifiedon","modifiedbyip","is_special_category","ctc2","batch_no","actual_paid_ctc2","ctc","ctc_paid_days","ctc_actual_paid","mobile_deduction","salaryid","bankaccountno","ifsccode","bankname","bankbranch","employeenps","employernps","insuranceamount","familyinsurance","issalarydownloaded","remarks","isarear","isarearprocessed","arearprocessmonth","arearprocessyear","arearprocessedby","arearprocessedon","arearprocessedbyip","employee_esi_incentive","employer_esi_incentive","total_esi_incentive","account1_7q_dues","account1_14b_dues","account10_7q_dues","account10_14b_dues","account2_7q_dues","account2_14b_dues","account21_7q_dues","account21_14b_dues","pf_due_date","pf_paid_date","totalarear","arearaddedmonths","employee_esi_incentive_deduction","employer_esi_incentive_deduction","total_esi_incentive_deduction","salaryindaysopted","mastersalarydays","otherledgerarears","otherledgerdeductions","is_rejected","reject_reason","rejected_on","rejected_by","recordscreen","esi_incentive_processed","esi_incentive_processedon","esi_incentive_processedby","esi_incentive_processedbyip","esi_incentive_processmonth","esi_incentive_processyear","attendancemode-2","incrementarear","incrementarear_basic","incrementarear_hra","incrementarear_allowance","incrementarear_gross","incrementarear_employeeesi","incrementarear_employeresi","lwf_employee","lwf_employer","othervariables","otherdeductions","bonus","otherledgerarearwithoutesi","otherbonuswithesi","salarydownloadedby","salarydownloadedon","salarydownloadedbyip","lwfstatecode","tdsadjustment","is_disbersible","atds","manual_tds_adjustment","manual_remarks","voucher_amount","voucher_remarks","salary_remarks","voucher_date","arearids","hrgeneratedon-2","transactionid","disbursedledgerids","security_amt","issalaryorliability","modification_comment","disbursementmode","istaxapplicable","tptype","professionaltax","is_billable","pfchallannumber","esichallannumber","lwfchallannumber","ptchallannumber","customtaxablecomponents","customnontaxablecomponents","payment_record_id","ratecommission","ratetransport_allowance","ratetravelling_allowance","rateleave_encashment","rateovertime_allowance","ratenotice_pay","ratehold_salary_non_taxable","ratechildren_education_allowance","rategratuityinhand","commission","transport_allowance","travelling_allowance","leave_encashment","overtime_allowance","notice_pay","hold_salary_non_taxable","children_education_allowance","gratuityinhand","ratesalarybonus","salarybonus","attendanceid","tea_allowance","unitname","departmentname","designationname","pfapplicablecomponents","esiapplicablecomponents","isgroupinsurance","employerinsuranceamount","perkamount","charity_contribution_amount","rejected_by_username","is_advice","mealvoucher","multipayoutrequestid","overtime","workflowappid","is_workflow_approved","tdsdeductionmonth","paymenttypeid","salaryjson","otherearningcomponents"
+"01 Feb 2026 00:00",6220.572043010721,"MPR",93385,1,2026,"2026-04-21 09:05:26.568775+00",6148,"2026-04-21 09:09:14.584051","137.116.131.202:60142",10010125,1,"2026-01-03 00:00:00",1.0,"Vishal Srivastava"," Senior Consultant - IoT ","{
+  ""country"": ""Delhi"",
+  ""dist"": """",
+  ""state"": """",
+  ""po"": """",
+  ""loc"": """",
+  ""vtc"": """",
+  ""subdist"": """",
+  ""street"": """",
+  ""house"": """",
+  ""landmark"": """"
+}","vsrivastava.negd@digitalindia.gov.in","9870150141","AGYPS4962K","Male      ","1966-12-20","NA","","","100410095901",28.0,3.0,31,100000.00,30000.00,0.0,0.0,108000.00,243000.00,9677.41935483871,2903.2258064516127,0.0,0.0,10451.612903225807,23516.129032258064,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,23516.129032258064,1161.2903225806451,0.0,0.0,16134.2666666667,0.0,0.0,0,0.0,0.0,0.0,17295.556989247343,6220.572043010721,355.1612903225807,806.1290322580645,0.0,0.0,0.0,0,NULL,0.00,"NewRecord",NULL,0.0,NULL,NULL,NULL,NULL,NULL,"2026-04-21 09:05:26.568775+00",NULL,256191.0,0.0,0.0,0.0,47820,"24140100020359","BARB0POWBOM","BOB","",0.0,0.0,0.0,0.0,NULL,NULL,"N","N",NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,0.00,NULL,0.00,0.00,0.00,"N",30,0.00,0.00,"0",NULL,NULL,NULL,"Current Wages",NULL,NULL,NULL,NULL,NULL,NULL,"MPR",0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.00,0.00,0.00,0.00,NULL,NULL,0.00,NULL,NULL,NULL,0,0.0,NULL,0.0,NULL,NULL,0.0,NULL,NULL,NULL,NULL,"01 Feb 2026 00:00",NULL,NULL,0.00,"S",NULL,"Salary","1","TP",0.00,"Y",NULL,NULL,NULL,NULL,NULL,NULL,NULL,5000.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,483.87,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,NULL,0.00,NULL,NULL,NULL,9677.42,0.00,"Y",115.258064516129,NULL,0.00,NULL,"N",0.00,0,0.00,-9999,"Y","current",0,"",0.00
+"01 Feb 2026 12:00",20.47,"Ledger",93384,1,2026,"2026-04-21 09:07:49.625752+00120260",6049,"2026-04-21 09:07:49.533297","137.116.131.202:60022|ghanalikka.24@digitalindia.gov.in#175",10010125,1,"2026-01-03 00:00:00",0.0,"Vishal Srivastava"," Senior Consultant - IoT ","{
+  ""country"": ""Delhi"",
+  ""dist"": """",
+  ""state"": """",
+  ""po"": """",
+  ""loc"": """",
+  ""vtc"": """",
+  ""subdist"": """",
+  ""street"": """",
+  ""house"": """",
+  ""landmark"": """"
+}","vsrivastava.negd@digitalindia.gov.in","9870150141","AGYPS4962K","Male      ","1966-12-20","NA","","","100410095901",0.0,0.0,31,100000.00,30000.00,0.0,0.0,108000.00,243000.00,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,43633.0,0.0,0.0,0.0,43612.53,0.0,0.0,0,0.0,0.0,0.0,43612.53,20.47,0.0,0.0,0.0,0.0,0.0,0,0.00,0.00,"","N",0.0,6148,"2026-04-21 09:09:14.955316","137.116.131.202:60142",NULL,NULL,"2026-04-21 09:07:49.625752+00120260",0.0,256191.0,0.0,0.0,0.0,47820,"24140100020359","BARB0POWBOM","BOB","",0.0,0.0,0.0,0.0,NULL,NULL,"N","N",NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,0.00,NULL,0.00,0.00,0.00,"N",30,43633.00,0.00,"0",NULL,NULL,NULL,"Current Wages",NULL,NULL,NULL,NULL,NULL,NULL,"Ledger",0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.00,0.00,0.00,0.00,0.00,0.00,0.00,NULL,NULL,NULL,NULL,0.0,NULL,43612.53,NULL,NULL,0.0,NULL,NULL,NULL,NULL,"01 Feb 2026 12:00",NULL,"71003",0.00,"S","Liability Converted to Salary on 2026-04-21 09:09:14.955316+00","Salary","1","TP",0.00,"Y",NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,0.00,NULL,NULL,NULL,NULL,NULL,"N",NULL,NULL,0.00,NULL,"N",NULL,0,0.00,-9999,"Y","current",NULL,NULL,0.00
+"01 Feb 2026 12:00",90473.0,"Ledger",93383,1,2026,"2026-04-21 09:07:49.578678+00120260",6049,"2026-04-21 09:07:49.533297","137.116.131.202:60022|ghanalikka.24@digitalindia.gov.in#175",10010125,1,"2026-01-03 00:00:00",0.0,"Vishal Srivastava"," Senior Consultant - IoT ","{
+  ""country"": ""Delhi"",
+  ""dist"": """",
+  ""state"": """",
+  ""po"": """",
+  ""loc"": """",
+  ""vtc"": """",
+  ""subdist"": """",
+  ""street"": """",
+  ""house"": """",
+  ""landmark"": """"
+}","vsrivastava.negd@digitalindia.gov.in","9870150141","AGYPS4962K","Male      ","1966-12-20","NA","","","100410095901",0.0,0.0,31,100000.00,30000.00,0.0,0.0,108000.00,243000.00,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,NULL,90473.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.0,0.0,0.0,0.0,90473.0,0.0,0.0,0.0,0.0,0.0,0,0.00,0.00,"","N",0.0,6148,"2026-04-21 09:09:14.955316","137.116.131.202:60142",NULL,NULL,"2026-04-21 09:07:49.578678+00120260",0.0,256191.0,0.0,0.0,0.0,47820,"24140100020359","BARB0POWBOM","BOB","",0.0,0.0,0.0,0.0,NULL,NULL,"N","N",NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,0.00,NULL,0.00,0.00,0.00,"N",30,0.00,0.00,"0",NULL,NULL,NULL,"Current Wages",NULL,NULL,NULL,NULL,NULL,NULL,"Ledger",0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.00,0.00,0.00,0.00,0.00,90473.00,0.00,NULL,NULL,NULL,NULL,0.0,NULL,0.0,NULL,NULL,0.0,NULL,NULL,NULL,NULL,"01 Feb 2026 12:00",NULL,"71002",0.00,"S","Liability Converted to Salary on 2026-04-21 09:09:14.955316+00","Voucher","0","TP",0.00,"Y",NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,0.00,NULL,NULL,NULL,NULL,NULL,"N",NULL,NULL,0.00,NULL,"N",NULL,0,0.00,-9999,"Y","current",NULL,NULL,0.00
+"31 Dec 2025 09:52",211329.4,"MPR",73740,12,2025,"2025-12-22 08:23:32.196386+00",6148,"2025-12-31 09:52:48.056967","137.116.131.202:57638",10010125,1,NULL,0.0,"Vishal Srivastava"," Senior Consultant - IoT ","{
+  ""country"": ""Delhi"",
+  ""dist"": """",
+  ""state"": """",
+  ""po"": """",
+  ""loc"": """",
+  ""vtc"": """",
+  ""subdist"": """",
+  ""street"": """",
+  ""house"": """",
+  ""landmark"": """"
+}","vsrivastava.negd@digitalindia.gov.in","9870150141","AGYPS4962K","Male      ","1966-12-20","NA","","","100410095901",0.0,31.0,31,100000.00,30000.00,0.0,0.0,108000.00,243000.00,100000.0,30000.0,0.0,0.0,108000.0,243000.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,243000.0,12000.0,0.0,0.0,19670.6,0.0,0.0,0,0.0,0.0,0.0,31670.6,211329.4,10750.5,1249.5,0.0,0.0,0.0,0,NULL,0.00,"NewRecord",NULL,0.0,NULL,NULL,NULL,NULL,NULL,"2025-12-22 08:23:32.196386+00",NULL,256191.0,0.0,0.0,0.0,47820,"24140100020359","BARB0POWBOM","BOB","",0.0,0.0,0.0,0.0,NULL,NULL,"N","N",NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,0.00,NULL,0.00,0.00,0.00,"N",30,0.00,0.00,"0",NULL,NULL,NULL,"Current Wages",NULL,NULL,NULL,NULL,NULL,NULL,"MPR",0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.00,0.00,0.00,0.00,NULL,NULL,0.00,NULL,NULL,NULL,0,0.0,NULL,19670.6,NULL,NULL,0.0,NULL,NULL,NULL,NULL,"31 Dec 2025 09:52",NULL,NULL,0.00,"S",NULL,"Salary","1","TP",0.00,"Y",NULL,NULL,NULL,NULL,NULL,NULL,NULL,5000.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,5000.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,NULL,0.00,NULL,NULL,NULL,100000.00,0.00,"Y",1191,NULL,0.00,NULL,"N",0.00,0,0.00,-9999,"Y","current",0,NULL,0.00
+"01 Dec 2025 00:00",211329.4,"MPR",68533,11,2025,"2025-11-19 10:37:04.304507+00",6148,"2025-12-01 01:01:06.885982","137.116.131.202:54533",10010125,1,NULL,0.0,"Vishal Srivastava"," Senior Consultant - IoT ","{
+  ""country"": ""Delhi"",
+  ""dist"": """",
+  ""state"": """",
+  ""po"": """",
+  ""loc"": """",
+  ""vtc"": """",
+  ""subdist"": """",
+  ""street"": """",
+  ""house"": """",
+  ""landmark"": """"
+}","vsrivastava.negd@digitalindia.gov.in","9870150141","AGYPS4962K","Male      ","1966-12-20","NA","","","100410095901",0.0,30.0,30,100000.00,30000.00,0.0,0.0,108000.00,243000.00,100000.0,30000.0,0.0,0.0,108000.0,243000.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,243000.0,12000.0,0.0,0.0,19670.6,0.0,0.0,0,0.0,0.0,0.0,31670.6,211329.4,10750.5,1249.5,0.0,0.0,0.0,0,NULL,0.00,"NewRecord",NULL,0.0,NULL,NULL,NULL,NULL,NULL,"2025-11-19 10:37:04.304507+00",NULL,256191.0,0.0,0.0,0.0,47820,"24140100020359","BARB0POWBOM","BOB","",0.0,0.0,0.0,0.0,NULL,NULL,"N","N",NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,0.00,NULL,0.00,0.00,0.00,"N",30,0.00,0.00,"0",NULL,NULL,NULL,"Current Wages",NULL,NULL,NULL,NULL,NULL,NULL,"MPR",0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.00,0.00,0.00,0.00,NULL,NULL,0.00,NULL,NULL,NULL,0,0.0,NULL,19670.6,NULL,NULL,0.0,NULL,NULL,NULL,NULL,"01 Dec 2025 00:00",NULL,NULL,0.00,"S",NULL,"Salary","1","TP",0.00,"Y",NULL,NULL,NULL,NULL,NULL,NULL,NULL,5000.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,5000.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,NULL,0.00,NULL,NULL,NULL,100000.00,0.00,"Y",1191,NULL,0.00,NULL,"N",0.00,0,0.00,-9999,"Y","current",0,NULL,0.00
+"01 Nov 2025 00:00",211329.4,"MPR",64308,10,2025,"2025-10-16 19:46:05.890817+00",6148,"2025-11-01 06:33:33.977253","203.145.171.238:33660",10010125,1,NULL,0.0,"Vishal Srivastava"," Senior Consultant - IoT ","{
+  ""country"": ""Delhi"",
+  ""dist"": """",
+  ""state"": """",
+  ""po"": """",
+  ""loc"": """",
+  ""vtc"": """",
+  ""subdist"": """",
+  ""street"": """",
+  ""house"": """",
+  ""landmark"": """"
+}","vsrivastava.negd@digitalindia.gov.in","9870150141","AGYPS4962K","Male      ","1966-12-20","NA","","","100410095901",0.0,31.0,31,100000.00,30000.00,0.0,0.0,108000.00,243000.00,100000.0,30000.0,0.0,0.0,108000.0,243000.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,243000.0,12000.0,0.0,0.0,19670.6,0.0,0.0,0,0.0,0.0,0.0,31670.6,211329.4,10750.5,1249.5,0.0,0.0,0.0,0,NULL,0.00,"NewRecord",NULL,0.0,NULL,NULL,NULL,NULL,NULL,"2025-10-16 19:46:05.890817+00",NULL,256191.0,0.0,0.0,0.0,47820,"24140100020359","BARB0POWBOM","BOB","",0.0,0.0,0.0,0.0,NULL,NULL,"N","N",NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,0.00,NULL,0.00,0.00,0.00,"N",30,0.00,0.00,"0",NULL,NULL,NULL,"Current Wages",NULL,NULL,NULL,NULL,NULL,NULL,"MPR",0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.00,0.00,0.00,0.00,NULL,NULL,0.00,NULL,NULL,NULL,0,0.0,NULL,19670.6,NULL,NULL,0.0,NULL,NULL,NULL,NULL,"01 Nov 2025 00:00",NULL,NULL,0.00,"S",NULL,"Salary","1","TP",0.00,"Y",NULL,NULL,NULL,NULL,NULL,NULL,NULL,5000.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,5000.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,NULL,0.00,NULL,NULL,NULL,100000.00,0.00,"Y",1191,NULL,0.00,NULL,"N",0.00,0,0.00,-9999,"Y","current",NULL,NULL,0.00
+"01 Oct 2025 00:00",211329.4,"MPR",60241,9,2025,"2025-09-23 05:55:54.055648+00",6148,"2025-10-01 05:15:47.313355","137.116.131.202:54218",10010125,1,NULL,0.0,"Vishal Srivastava","","{
+  ""country"": ""Delhi"",
+  ""dist"": """",
+  ""state"": """",
+  ""po"": """",
+  ""loc"": """",
+  ""vtc"": """",
+  ""subdist"": """",
+  ""street"": """",
+  ""house"": """",
+  ""landmark"": """"
+}","vsrivastava.negd@digitalindia.gov.in","9870150141","AGYPS4962K","Male      ","1966-12-20","NA","",NULL,"100410095901",0.0,30.0,30,100000.00,30000.00,0.0,0.0,108000.00,243000.00,100000.0,30000.0,0.0,0.0,108000.0,243000.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,243000.0,12000.0,0.0,0.0,19670.6,0.0,0.0,0,0.0,0.0,0.0,31670.6,211329.4,10750.5,1249.5,0.0,0.0,0.0,0,NULL,0.00,"NewRecord",NULL,0.0,NULL,NULL,NULL,NULL,NULL,"2025-09-23 05:55:54.055648+00",NULL,256191.0,0.0,0.0,0.0,47820,"24140100020359","BARB0POWBOM","BOB","",0.0,0.0,0.0,0.0,NULL,NULL,"N","N",NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,0.00,NULL,0.00,0.00,0.00,"N",30,0.00,0.00,"0",NULL,NULL,NULL,"Current Wages",NULL,NULL,NULL,NULL,NULL,NULL,"MPR",0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.00,0.00,0.00,0.00,NULL,NULL,0.00,NULL,NULL,NULL,0,0.0,NULL,19670.6,NULL,NULL,0.0,NULL,NULL,NULL,NULL,"01 Oct 2025 00:00",NULL,NULL,0.00,"S",NULL,"Salary","1","TP",0.00,"Y",NULL,NULL,NULL,NULL,NULL,NULL,NULL,5000.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,5000.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,NULL,0.00,NULL,NULL,NULL,100000.00,0.00,"Y",1191,NULL,0.00,NULL,"N",0.00,0,0.00,-9999,"Y","current",NULL,NULL,0.00
+"29 Aug 2025 08:48",210138.4,"MPR",54325,8,2025,"2025-08-20 07:53:56.528022+00",6148,"2025-08-29 08:48:43.477185","137.116.131.202:54618",10010125,1,NULL,2.0,"Vishal Srivastava","Senior Consultant - IoT","{
+  ""country"": ""Delhi"",
+  ""dist"": """",
+  ""state"": """",
+  ""po"": """",
+  ""loc"": """",
+  ""vtc"": """",
+  ""subdist"": """",
+  ""street"": """",
+  ""house"": """",
+  ""landmark"": """"
+}","vsrivastava.negd@digitalindia.gov.in","9870150141","AGYPS4962K","Male      ","1966-12-20","NA","",NULL,"100410095901",0.0,31.0,31,100000.00,30000.00,0.0,0.0,108000.00,243000.00,100000.0,30000.0,0.0,0.0,108000.0,243000.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,243000.0,12000.0,0.0,0.0,19670.6,0.0,0.0,1191,0.0,0.0,0.0,32861.6,210138.4,10750.5,1249.5,0.0,0.0,0.0,0,NULL,0.00,"NewRecord",NULL,0.0,NULL,NULL,NULL,NULL,NULL,"2025-08-20 07:53:56.528022+00",NULL,256191.0,0.0,0.0,0.0,18401,"24140100020359","BARB0POWBOM","BOB","",0.0,0.0,1191.0,0.0,NULL,NULL,"N","N",NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,0.00,NULL,0.00,0.00,0.00,"N",30,0.00,0.00,"0",NULL,NULL,NULL,"Current Wages",NULL,NULL,NULL,NULL,NULL,NULL,"MPR",0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.00,0.00,0.00,0.00,NULL,NULL,0.00,NULL,NULL,NULL,0,0.0,NULL,19670.6,NULL,NULL,0.0,NULL,NULL,NULL,NULL,"29 Aug 2025 08:48",NULL,NULL,0.00,"S",NULL,"Salary","1","TP",0.00,"Y",NULL,NULL,NULL,NULL,NULL,NULL,NULL,5000.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,5000.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,NULL,0.00,NULL,NULL,NULL,100000.00,108000.00,"Y",1191,NULL,0.00,NULL,"N",0.00,0,0.00,-9999,"Y","current",NULL,NULL,0.00
+"01 Aug 2025 00:00",210138.4,"MPR",51148,7,2025,"2025-07-23 07:24:52.562175+00",6148,"2025-08-01 08:41:44.682294","137.116.131.202:56742",10010125,1,NULL,0.0,"Vishal Srivastava","Senior Consultant - IoT","{
+  ""country"": ""Delhi"",
+  ""dist"": """",
+  ""state"": """",
+  ""po"": """",
+  ""loc"": """",
+  ""vtc"": """",
+  ""subdist"": """",
+  ""street"": """",
+  ""house"": """",
+  ""landmark"": """"
+}","vsrivastava.negd@digitalindia.gov.in","9870150141","AGYPS4962K","Male      ","1966-12-20","NA","",NULL,"100410095901",0.0,31.0,31,100000.00,30000.00,0.0,0.0,108000.00,243000.00,100000.0,30000.0,0.0,0.0,108000.0,243000.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,243000.0,12000.0,0.0,0.0,19670.6,0.0,0.0,1191,0.0,0.0,0.0,32861.6,210138.4,10750.5,1249.5,0.0,0.0,0.0,0,NULL,0.00,"NewRecord",NULL,0.0,NULL,NULL,NULL,NULL,NULL,"2025-07-23 07:24:52.562175+00",NULL,256191.0,0.0,0.0,0.0,18401,"24140100020359","BARB0POWBOM","BOB","",0.0,0.0,1191.0,0.0,NULL,NULL,"N","N",NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,0.00,NULL,0.00,0.00,0.00,"N",30,0.00,0.00,"0",NULL,NULL,NULL,"Current Wages",NULL,NULL,NULL,NULL,NULL,NULL,"MPR",0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.00,0.00,0.00,0.00,NULL,NULL,0.00,NULL,NULL,NULL,0,0.0,NULL,19670.6,NULL,NULL,0.0,NULL,NULL,NULL,NULL,"01 Aug 2025 00:00",NULL,NULL,0.00,"S",NULL,"Salary","1","TP",0.00,"Y",NULL,NULL,NULL,NULL,NULL,NULL,NULL,5000.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,5000.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,NULL,0.00,NULL,NULL,NULL,100000.00,108000.00,"Y",1191,NULL,0.00,NULL,"N",0.00,0,0.00,-9999,"Y","current",NULL,NULL,0.00
+"02 Jul 2025 18:28",210138.4,"MPR",43435,6,2025,"2025-06-24 02:20:41.894445+00",6148,"2025-07-02 18:28:40.608603","137.116.131.202:64080",10010125,1,NULL,0.0,"Vishal Srivastava","Senior Consultant - IoT","{
+  ""country"": ""Delhi"",
+  ""dist"": """",
+  ""state"": """",
+  ""po"": """",
+  ""loc"": """",
+  ""vtc"": """",
+  ""subdist"": """",
+  ""street"": """",
+  ""house"": """",
+  ""landmark"": """"
+}","vsrivastava.negd@digitalindia.gov.in","9870150141","AGYPS4962K","Male      ","1966-12-20","NA","",NULL,"100410095901",0.0,30.0,30,100000.00,30000.00,0.0,0.0,108000.00,243000.00,100000.0,30000.0,0.0,0.0,108000.0,243000.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,243000.0,12000.0,0.0,0.0,19670.6,0.0,0.0,1191,0.0,0.0,0.0,32861.6,210138.4,10750.5,1249.5,0.0,0.0,0.0,0,NULL,0.00,"NewRecord",NULL,0.0,NULL,NULL,NULL,NULL,NULL,"2025-06-24 02:20:41.894445+00",NULL,256191.0,0.0,0.0,0.0,18401,"24140100020359","BARB0POWBOM","BOB","",0.0,0.0,1191.0,0.0,NULL,NULL,"N","N",NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,0.00,NULL,0.00,0.00,0.00,"N",30,0.00,0.00,"0",NULL,NULL,NULL,"Current Wages",NULL,NULL,NULL,NULL,NULL,NULL,"MPR",0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.00,0.00,0.00,0.00,NULL,NULL,0.00,NULL,NULL,NULL,0,0.0,NULL,19670.6,NULL,NULL,0.0,NULL,NULL,NULL,NULL,"02 Jul 2025 18:28",NULL,NULL,0.00,"S",NULL,"Salary","1","TP",0.00,"Y",NULL,NULL,NULL,NULL,NULL,NULL,NULL,5000.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,5000.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,NULL,0.00,NULL,NULL,NULL,100000.00,108000.00,"Y",1191,NULL,0.00,NULL,"N",NULL,0,0.00,-9999,"Y","current",NULL,NULL,0.00
+"01 Jun 2025 00:00",210138.0,"MPR",40965,5,2025,"2025-06-07 01:07:37.132199+00",6049,"2025-06-07 01:07:37.132199","49.36.136.200:52459",10010125,1,NULL,0.0,"Vishal Srivastava","Senior Consultant - IoT","{
+  ""country"": ""Delhi"",
+  ""dist"": """",
+  ""state"": """",
+  ""po"": """",
+  ""loc"": """",
+  ""vtc"": """",
+  ""subdist"": """",
+  ""street"": """",
+  ""house"": """",
+  ""landmark"": """"
+}","vsrivastava.negd@digitalindia.gov.in","9870150141","AGYPS4963K","Male      ","1966-12-20","NA","",NULL,"100410095901",0.0,31.0,31,100000.00,30000.00,0.0,0.0,108000.00,243000.00,100000.0,30000.0,0.0,0.0,108000.0,243000.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,243000.0,12000.0,0.0,0.0,19671.0,0.0,0.0,1191,0.0,0.0,0.0,32862.0,210138.0,10750.5,1249.5,0.0,0.0,0.0,0,NULL,0.00,"NewRecord",NULL,0.0,NULL,NULL,NULL,NULL,NULL,"2025-06-07 01:07:37.132199+00",NULL,256191.0,0.0,0.0,0.0,18401,"24140100020359","BARB0POWBOM","BOB","",0.0,0.0,1191.0,0.0,NULL,NULL,"N","N",NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,0.00,NULL,0.00,0.00,0.00,"N",30,0.00,0.00,"0",NULL,NULL,NULL,"Current Wages",NULL,NULL,NULL,NULL,NULL,NULL,"MPR",0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.00,0.00,0.00,0.00,NULL,NULL,0.00,NULL,NULL,NULL,0,0.0,NULL,19671.0,NULL,NULL,0.0,NULL,NULL,NULL,NULL,"01 Jun 2025 00:00",NULL,NULL,0.00,"S",NULL,"Salary","1","TP",0.00,"Y",NULL,NULL,NULL,NULL,NULL,NULL,NULL,5000.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,5000.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,NULL,0.00,NULL,NULL,NULL,100000.00,108000.00,"Y",1191,NULL,0.00,NULL,"N",NULL,0,0.00,-9999,"Y","current",NULL,NULL,0.00
+"01 May 2025 00:00",192343.0,"MPR",36294,4,2025,"2025-05-01 17:59:20.383447+00",6049,"2025-05-01 17:59:20.383447","137.116.131.202:53996",10010125,1,NULL,0.0,"Vishal Srivastava"," Senior Consultant - IoT ","{
+  ""country"": ""Delhi"",
+  ""dist"": """",
+  ""state"": """",
+  ""po"": """",
+  ""loc"": """",
+  ""vtc"": """",
+  ""subdist"": """",
+  ""street"": """",
+  ""house"": """",
+  ""landmark"": """"
+}","vsrivastava.negd@digitalindia.gov.in","9870150141","AGYPS4963K","Male      ","1966-12-20","NA","",NULL,"100410095901",0.0,30.0,30,100000.00,30000.00,0.0,0.0,108000.00,243000.00,100000.0,30000.0,0.0,0.0,108000.0,243000.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,243000.0,12000.0,0.0,0.0,37466.0,0.0,0.0,1191,0.0,0.0,0.0,50657.0,192343.0,10750.5,1249.5,0.0,0.0,0.0,0,NULL,0.00,"NewRecord",NULL,0.0,NULL,NULL,NULL,NULL,NULL,"2025-05-01 17:59:20.383447+00",NULL,256191.0,0.0,0.0,0.0,18401,"24140100020359","BARB0POWBOM","BOB","",0.0,0.0,1191.0,0.0,NULL,NULL,"N","N",NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,0.00,NULL,0.00,0.00,0.00,"N",30,0.00,0.00,"0",NULL,NULL,NULL,"Current Wages",NULL,NULL,NULL,NULL,NULL,NULL,"MPR",0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.00,0.00,0.00,0.00,NULL,NULL,0.00,NULL,NULL,NULL,0,0.0,NULL,37466.0,NULL,NULL,0.0,NULL,NULL,NULL,NULL,"01 May 2025 00:00",NULL,NULL,0.00,"S",NULL,"Salary","1","TP",0.00,"Y",NULL,NULL,NULL,NULL,NULL,NULL,NULL,5000.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,5000.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,NULL,0.00,NULL,NULL,NULL,100000.00,108000.00,"Y",1191,NULL,0.00,NULL,"N",NULL,0,0.00,-9999,"Y","current",NULL,NULL,0.00
+"01 Apr 2025 00:00",229809.0,"MPR",31898,3,2025,"2025-04-01 10:14:14.748676+00",6049,"2025-04-01 10:14:14.748676","137.116.131.202:63916",10010125,1,NULL,1.0,"Vishal Srivastava"," Senior Consultant - IoT ","{
+  ""country"": ""Delhi"",
+  ""dist"": """",
+  ""state"": """",
+  ""po"": """",
+  ""loc"": """",
+  ""vtc"": """",
+  ""subdist"": """",
+  ""street"": """",
+  ""house"": """",
+  ""landmark"": """"
+}","vsrivastava.negd@digitalindia.gov.in","9870150141","AGYPS4963K","Male      ","1966-12-20","NA","",NULL,"100410095901",0.0,31.0,31,100000.00,30000.00,0.0,0.0,108000.00,243000.00,100000.0,30000.0,0.0,0.0,108000.0,243000.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,243000.0,12000.0,0.0,0.0,0.0,0.0,0.0,1191,0.0,0.0,0.0,13191.0,229809.0,10750.5,1249.5,0.0,0.0,0.0,0,NULL,0.00,"NewRecord",NULL,0.0,NULL,NULL,NULL,NULL,NULL,"2025-04-01 10:14:14.748676+00",NULL,256191.0,0.0,0.0,0.0,18401,"24140100020359","BARB0POWBOM","BOB","",0.0,0.0,1191.0,0.0,NULL,NULL,"N","N",NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,0.00,NULL,0.00,0.00,0.00,"N",30,0.00,0.00,"0",NULL,NULL,NULL,"Current Wages",NULL,NULL,NULL,NULL,NULL,NULL,"MPR",0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.00,0.00,0.00,0.00,NULL,NULL,0.00,NULL,NULL,NULL,0,0.0,NULL,0.0,NULL,NULL,0.0,NULL,NULL,NULL,NULL,"01 Apr 2025 00:00",NULL,NULL,0.00,"S",NULL,"Salary","1","TP",0.00,"Y",NULL,NULL,NULL,NULL,NULL,NULL,732,5000.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,5000.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,NULL,0.00,NULL,NULL,NULL,100000.00,108000.00,"Y",1191,NULL,0.00,NULL,"N",NULL,0,0.00,-9999,"Y","current",NULL,NULL,0.00
+"05 Mar 2025 00:00",229809.0,"MPR",26623,2,2025,"2025-03-05 05:19:57.073633+00",6049,"2025-03-05 05:19:57.073633","137.116.131.202:56990",10010125,1,NULL,0.0,"Vishal Srivastava","Senior Consultant - IoT","{
+  ""country"": ""Delhi"",
+  ""dist"": """",
+  ""state"": """",
+  ""po"": """",
+  ""loc"": """",
+  ""vtc"": """",
+  ""subdist"": """",
+  ""street"": """",
+  ""house"": """",
+  ""landmark"": """"
+}","vishal.srivastava@digitalindia.gov.in","9870150141","AGYPS4963K","Male      ","1966-12-20","NA","",NULL,"100410095901",0.0,28.0,28,100000.00,30000.00,0.0,0.0,108000.00,243000.00,100000.0,30000.0,0.0,0.0,108000.0,243000.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,243000.0,12000.0,0.0,0.0,0.0,0.0,0.0,1191,0.0,0.0,0.0,13191.0,229809.0,10750.5,1249.5,0.0,0.0,0.0,0,NULL,0.00,"NewRecord",NULL,0.0,NULL,NULL,NULL,NULL,NULL,"2025-03-05 05:19:57.073633+00",NULL,256191.0,0.0,0.0,0.0,18401,"24140100020359","BARB0POWBOM","BOB","",0.0,0.0,1191.0,0.0,NULL,NULL,"N","N",NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,0.00,NULL,0.00,0.00,0.00,"N",30,0.00,0.00,"0",NULL,NULL,NULL,"Current Wages",NULL,NULL,NULL,NULL,NULL,NULL,"MPR",0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.00,0.00,0.00,0.00,NULL,NULL,0.00,NULL,NULL,NULL,0,0.0,NULL,0.0,NULL,NULL,0.0,NULL,NULL,NULL,NULL,"05 Mar 2025 00:00",NULL,NULL,0.00,"S",NULL,"Salary","1","TP",0.00,"Y",NULL,NULL,NULL,NULL,NULL,NULL,659,5000.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,5000.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,NULL,0.00,NULL,NULL,NULL,100000.00,108000.00,"Y",1191,NULL,0.00,NULL,"N",NULL,0,0.00,-9999,"Y","current",NULL,NULL,0.00
+"04 Mar 2025 00:00",195296.0,"MPR",26498,1,2025,"2025-03-04 11:52:00.613463+00",6049,"2025-03-04 11:52:00.613463","137.116.131.202:56857",10010125,1,NULL,0.0,"Vishal Srivastava","Senior Consultant - IoT","{
+  ""country"": ""Delhi"",
+  ""dist"": """",
+  ""state"": """",
+  ""po"": """",
+  ""loc"": """",
+  ""vtc"": """",
+  ""subdist"": """",
+  ""street"": """",
+  ""house"": """",
+  ""landmark"": """"
+}","vishal.srivastava@digitalindia.gov.in","9870150141","AGYPS4963K","Male      ","1966-12-20","NA","",NULL,"100410095901",0.0,31.0,31,100000.00,30000.00,0.0,0.0,108000.00,243000.00,100000.0,30000.0,0.0,0.0,108000.0,243000.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,243000.0,12000.0,0.0,0.0,34513.0,0.0,0.0,1191,0.0,0.0,0.0,47704.0,195296.0,10750.5,1249.5,0.0,0.0,0.0,0,NULL,0.00,"NewRecord",NULL,0.0,NULL,NULL,NULL,NULL,NULL,"2025-03-04 11:52:00.613463+00",NULL,256191.0,0.0,0.0,0.0,18401,"24140100020359","BARB0POWBOM","BOB","",0.0,0.0,1191.0,0.0,NULL,NULL,"N","N",NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,0.00,NULL,0.00,0.00,0.00,"N",30,0.00,0.00,"0",NULL,NULL,NULL,"Current Wages",NULL,NULL,NULL,NULL,NULL,NULL,"MPR",0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.00,0.00,0.00,0.00,NULL,NULL,0.00,NULL,NULL,NULL,0,0.0,NULL,34513.0,NULL,NULL,0.0,NULL,NULL,NULL,NULL,"04 Mar 2025 00:00",NULL,NULL,0.00,"S",NULL,"Salary","1","TP",0.00,"Y",NULL,NULL,NULL,NULL,NULL,NULL,652,5000.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,5000.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,NULL,0.00,NULL,NULL,NULL,100000.00,108000.00,"Y",1191,NULL,0.00,NULL,"N",NULL,0,0.00,-9999,"Y","current",NULL,NULL,0.00
+"16 Jan 2025 00:00",195296.0,"MPR",21432,12,2024,"2025-01-16 12:07:46.826452+00",6049,"2025-01-16 12:07:46.826452","164.100.203.50:53746",10010125,1,NULL,0.0,"Vishal Srivastava","Senior Consultant - IoT","{
+  ""country"": ""Delhi"",
+  ""dist"": """",
+  ""state"": """",
+  ""po"": """",
+  ""loc"": """",
+  ""vtc"": """",
+  ""subdist"": """",
+  ""street"": """",
+  ""house"": """",
+  ""landmark"": """"
+}","vishal.srivastava@digitalindia.gov.in","9870150141","AGYPS4963K","Male      ","1966-12-20","NA","",NULL,"100410095901",0.0,31.0,31,100000.00,30000.00,0.0,0.0,108000.00,243000.00,100000.0,30000.0,0.0,0.0,108000.0,243000.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,243000.0,12000.0,0.0,0.0,34513.0,0.0,0.0,1191,0.0,0.0,0.0,47704.0,195296.0,10750.5,1249.5,0.0,0.0,0.0,0,NULL,0.00,"NewRecord",NULL,0.0,NULL,NULL,NULL,NULL,NULL,"2025-01-16 12:07:46.826452+00",NULL,256191.0,0.0,0.0,0.0,18401,"24140100020359","BARB0POWBOM","BOB","",0.0,0.0,1191.0,0.0,NULL,NULL,"N","N",NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,0.00,NULL,0.00,0.00,0.00,"N",30,0.00,0.00,"0",NULL,NULL,NULL,"Current Wages",NULL,NULL,NULL,NULL,NULL,NULL,"MPR",0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.00,0.00,0.00,0.00,NULL,NULL,0.00,NULL,NULL,NULL,0,0.0,NULL,34513.0,NULL,NULL,0.0,NULL,NULL,NULL,NULL,"16 Jan 2025 00:00",NULL,NULL,0.00,"S",NULL,"Salary","1","TP",0.00,"Y",NULL,NULL,NULL,NULL,NULL,NULL,476,5000.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,5000.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,NULL,0.00,NULL,NULL,NULL,100000.00,108000.00,"Y",1191,NULL,0.00,NULL,"N",NULL,0,0.00,-9999,"Y","current",NULL,NULL,0.00

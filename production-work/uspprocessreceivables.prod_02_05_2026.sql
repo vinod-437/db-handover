@@ -198,8 +198,11 @@ begin
 							Payrolling code
 	2.16	01-Jul-2025		To disable Auto Adjustments feature			Shiv Kumar
 							(as per mail dated 01-Jul-2025)
+	2.17	02-Apr-2026		Offroll Payrolling to EOR Invoice & Billing Code from ORP/2627/ to EOR/2627/   & Same with the Offroll Payrolling Receipt to EOR Receipt					
 	**************************************************************************************************/
 /****Step 1*****Calculate And display Total Amount to Employer*************************/
+
+p_createdbyip :=left(p_createdbyip,30);	
 if p_action='CalcReciebaleFromBaseAmount' then 
 		if p_customeraccountid is null then
 			open v_rfc for
@@ -216,11 +219,10 @@ if p_action='CalcReciebaleFromBaseAmount' then
 		select * from tbl_account where id=p_customeraccountid into v_tbl_account;
 		/********change 2.8 ends********************************************/		
 		
-	    update tbl_receivables set isactive='0' where customeraccountid=p_customeraccountid and orderno<>p_ordernumber and status='Pending' and paymentmethod='HDFC Manual' and isactive='1'  /*and billtype=p_billtype and invoicemonth=p_invoicemonth and invoiceyear=p_invoiceyear*/;
+	    update tbl_receivables set isactive='0' where customeraccountid=p_customeraccountid and orderno<>p_ordernumber and status='Pending' and paymentmethod='HDFC Manual' and isactive='1'  and source<>'Tpayops'/*and billtype=p_billtype and invoicemonth=p_invoicemonth and invoiceyear=p_invoiceyear*/;
 		select gstno,employername,address,employer.state, cinno,panno,gstno 
 		into v_mygstno,v_employername,v_employeraddress,v_employerstatename,v_employercinno,v_employerpanno,v_employergstno 
 		from public.employer where employerid=1 and active='1';
-		--and source<>'Tpayops';
 		
 		select ac_gstin_no,(string_to_array(accountname::varchar,'#'))[1]::varchar ,mobile,account_contact_name,coalesce(address,'')||case when nullif(ac_gstin_no,'') is null then ' '||tbl_account.city||', '||tbl_account.state||'-'||tbl_account.pincode else '' end address,left(ac_gstin_no,2),state,trim(payout_mode_type) 
 		into v_customergstno,v_customeraccountname,v_customermobilenumber,v_contactname,v_address,v_statecode,v_accountstatename,v_payout_mode_type 
@@ -454,7 +456,7 @@ end if;
 		select ratevalue into v_sgstrate from tbl_ratemaster where ratemastername='SGST' and isactive='1';
 		select ratevalue into v_igstrate from tbl_ratemaster where ratemastername='IGST' and isactive='1';
 		
-		if p_entrytype='Receipt' or (p_baseamount=0 and p_creditamount=0.0) then
+		if (p_entrytype='Receipt' and v_payout_mode_type not in ('EOR','DFM') )or (p_baseamount=0 and p_creditamount=0.0) then
 			v_cgstrate:=0.0;
 			v_sgstrate:=0.0;
 			v_igstrate:=0.0; 
@@ -568,8 +570,8 @@ from public.tbl_account where id=p_customeraccountid;
 		,billing_state
 		,receiptpushedtotally
 	)
+VALUES (p_customeraccountid,v_customermobilenumber,v_customeraccountname, p_numberofemployees,current_date, case when p_producttypeid='2' and p_entrytype='Receipt' and p_packagename<>'Starting Payment' and v_payout_mode_type not in ('EOR','DFM')  then v_receivableamount else v_netamountreceived end,case when (p_entrytype='Invoice' and p_producttypeid='2'and v_payout_mode_type not in ('EOR','DFM')) then v_originalservicechargerate else  v_servicechargerate end,case when p_producttypeid='2' and p_entrytype='Invoice' and v_payout_mode_type not in ('EOR','DFM') then v_baseamount else v_servicechargeamount end,v_gstmode, v_sgstrate, v_sgstamount, v_cgstrate, v_cgstamount, v_igstrate, v_igstamount,case when p_producttypeid='2' and p_entrytype='Invoice' and v_payout_mode_type not in ('EOR','DFM') then  0 when p_producttypeid='2' and p_entrytype='Receipt' and p_packagename<>'Starting Payment'  then v_receivableamount else v_baseamount end,  p_source, p_created_by, current_timestamp, p_createdbyip,'1'::bit,case when p_baseamount='0' and coalesce(v_credit_applicable,'N')='Y' then 'Paid' when v_tbl_account.payment_plan='Manual' then 'Paid' when v_credit_applicable='Y' then 'Outstanding'	else 'Pending' end,v_invoiceno,current_date,p_invoicetype,v_service_name,p_packagename,v_hsn_sac_number	
 --VALUES (p_customeraccountid,v_customermobilenumber,v_customeraccountname, p_numberofemployees,current_date, case when p_producttypeid='2' and p_entrytype='Receipt' and p_packagename<>'Starting Payment'  then v_receivableamount else v_netamountreceived end,case when (p_entrytype='Invoice' and p_producttypeid='2') then v_originalservicechargerate else  v_servicechargerate end,case when p_producttypeid='2' and p_entrytype='Invoice' then v_baseamount else v_servicechargeamount end,v_gstmode, v_sgstrate, v_sgstamount, v_cgstrate, v_cgstamount, v_igstrate, v_igstamount,case when p_producttypeid='2' and p_entrytype='Invoice' then  0 when p_producttypeid='2' and p_entrytype='Receipt' and p_packagename<>'Starting Payment'  then v_receivableamount else v_baseamount end,  p_source, p_created_by, current_timestamp, p_createdbyip,'1'::bit,case when p_baseamount='0' and coalesce(v_credit_applicable,'N')='Y' then 'Paid' when v_tbl_account.payment_plan='Manual' then 'Paid' when v_credit_applicable='Y' then 'Outstanding'	else 'Pending' end,v_invoiceno,current_date,p_invoicetype,v_service_name,p_packagename,v_hsn_sac_number
-VALUES (p_customeraccountid,v_customermobilenumber,v_customeraccountname, p_numberofemployees,current_date, case when p_producttypeid='2' and p_entrytype='Receipt' and p_packagename<>'Starting Payment'  then v_receivableamount else v_netamountreceived end,case when (p_entrytype='Invoice' and p_producttypeid='2') then v_originalservicechargerate else  v_servicechargerate end,case when p_producttypeid='2' and p_entrytype='Invoice' then v_baseamount else v_servicechargeamount end,v_gstmode, v_sgstrate, v_sgstamount, v_cgstrate, v_cgstamount, v_igstrate, v_igstamount,case when p_producttypeid='2' and p_entrytype='Invoice' then  0 when p_producttypeid='2' and p_entrytype='Receipt' and p_packagename<>'Starting Payment'  then v_receivableamount else v_baseamount end,  p_source, p_created_by, current_timestamp, p_createdbyip,'1'::bit,case when p_baseamount='0' and coalesce(v_credit_applicable,'N')='Y' then 'Paid' when v_tbl_account.payment_plan='Manual' then 'Paid' when v_credit_applicable='Y' then 'Outstanding'	else 'Pending' end,v_invoiceno,current_date,p_invoicetype,v_service_name,p_packagename,v_hsn_sac_number
 	   ,v_credit_applicable,'N',case when coalesce(v_credit_applicable,'N')='N' then null else nullif(p_month,-9999) end,case when coalesce(v_credit_applicable,'N')='N' then null else nullif(p_year,-9999) end,case when p_baseamount=0 then 'HDFC Manual' else p_paymentmethod end
 	   ,p_entrytype,p_producttypeid
 	   ,(case when p_entrytype='Receipt' or v_tbl_account.payment_plan='Manual' then '1' else '0' end)::bit 
@@ -639,7 +641,7 @@ end if;
 					,v_employername employername,v_employeraddress employeraddress,v_employerstatename employerstatename,v_employercinno employercinno,v_employerpanno employerpanno,v_employergstno employergstno,
 					fnnumbertowords(case when p_producttypeid='2' and p_entrytype='Receipt' and p_packagename<>'Starting Payment'  then v_receivableamount else v_netamountreceived end+coalesce(v_recreceiptinvoice.netamountreceived,0)-coalesce(v_recreceiptinvoice.adjustmentamount,0)) amountinwords,v_jurisdiction jurisdiction,v_accountstatename accountstatename,
 					v_invoiceno pinumber,to_char(current_date,'dd-mon-yy') as pidate,'Processing Charge' as processingcharge_title,'998514' hsnsacnumber,v_service_name service_name,v_message paymessage
-					,case when p_producttypeid='2' and p_entrytype='Receipt' and p_packagename<>'Starting Payment'  then v_receivableamount else v_netamountreceived end+coalesce(v_recreceiptinvoice.netamountreceived,0) netamountreceived;
+					,case when p_producttypeid='2' and p_entrytype='Receipt' and p_packagename<>'Starting Payment'  and v_payout_mode_type not in ('EOR','DFM') then v_receivableamount else v_netamountreceived end+coalesce(v_recreceiptinvoice.netamountreceived,0) netamountreceived;
 			else
 				open v_rfc for
 				select p_customeraccountid customeraccountid,v_customermobilenumber customermobilenumber,v_customeraccountname customeraccountname, p_numberofemployees numberofemployees,v_baseamount payoutamount,v_baseamount baseamount, v_netamountreceived amount_to_pay,v_servicechargerate servicechargerate,v_servicechargeamount servicechargeamount,v_gstmode gstmode, v_sgstrate sgstrate, v_sgstamount sgstamount, v_cgstrate cgstrate, v_cgstamount cgstamount, v_igstrate igstrate, v_igstamount igstamount
@@ -709,7 +711,7 @@ else
 			(status in ('Outstanding','Pending') and coalesce(nullif(receipt_amount,0),netamount)=p_netvalue and entrytype='Receipt')
 			or
 			-- AG CHANGE: Match the Invoice row for DFM where no Receipt row exists initially
-			(v_payout_mode_type='dfm' and status='Paid' and p_producttypeid='2' and entrytype='Invoice')
+			(v_payout_mode_type='dfm' and status='Pending' and p_producttypeid='2' and entrytype='Invoice')
 		)
 		and isactive='1'
 		and packagename=p_packagename
@@ -717,7 +719,6 @@ else
 	into v_invoiceno;
 end if;
 select ac_gstin_no,accountname,mobile,trim(payout_mode_type) into v_customergstno,v_customeraccountname,v_customermobilenumber,v_payout_mode_type from public.tbl_account where id=p_customeraccountid;
-
 	if p_packagename='Starting Payment' and p_entrytype='Receipt' and p_producttypeid='2' then
 	update tbl_receivables 
 		set packagename=p_packagename,senttogateway='Y' ,created_by=p_created_by,createdbyip=p_createdbyip,Status='Paid',dateofreceiving=current_date
@@ -753,7 +754,10 @@ select ac_gstin_no,accountname,mobile,trim(payout_mode_type) into v_customergstn
 					from public.tbl_receivables where id=v_id;
 						return v_rfc;
 		else	
-				update tbl_receivables set packagename=p_packagename,senttogateway='Y' ,created_by=p_created_by,createdbyip=p_createdbyip
+				update tbl_receivables set packagename=p_packagename,senttogateway='Y' ,created_by=p_created_by,createdbyip=p_createdbyip,
+					status = case when v_payout_mode_type='dfm' then 'Paid' else status end,
+					paymentmethod = case when v_payout_mode_type='dfm' then 'DFM Auto' else paymentmethod end,
+					dateofreceiving = case when v_payout_mode_type='dfm' then current_date else dateofreceiving end
 					where customeraccountid=p_customeraccountid
 					and (status in ('Pending','Outstanding') or (v_payout_mode_type='dfm' and status='Paid' and p_producttypeid='2')) 
 					--and coalesce(senttogateway,'N')='N'
@@ -765,7 +769,10 @@ select ac_gstin_no,accountname,mobile,trim(payout_mode_type) into v_customergstn
 				-- AG CHANGE: Returning ID here instead of Receipt update since DFM has no Receipt initially
 				returning id into v_id;
 
-				update tbl_receivables set packagename=p_packagename,senttogateway='Y' ,created_by=p_created_by,createdbyip=p_createdbyip
+				update tbl_receivables set packagename=p_packagename,senttogateway='Y' ,created_by=p_created_by,createdbyip=p_createdbyip,
+					status = case when v_payout_mode_type='dfm' then 'Paid' else status end,
+					paymentmethod = case when v_payout_mode_type='dfm' then 'DFM Auto' else paymentmethod end,
+					dateofreceiving = case when v_payout_mode_type='dfm' then current_date else dateofreceiving end
 					where customeraccountid=p_customeraccountid
 					and (status in ('Pending','Outstanding') or (v_payout_mode_type='dfm' and status='Paid' and p_producttypeid='2')) 
 					--and coalesce(senttogateway,'N')='N'
@@ -774,7 +781,7 @@ select ac_gstin_no,accountname,mobile,trim(payout_mode_type) into v_customergstn
 					and isactive='1' 
 					and invoiceno=v_invoiceno
 					and entrytype='Receipt';
-					
+
 				-- AG CHANGE: Automatically insert a 'Receipt' row for DFM to update the ledger balance and eliminate shortfall
 				if v_payout_mode_type='dfm' and p_producttypeid='2' and v_invoiceno is not null then
 					if not exists (select * from tbl_receivables where invoiceno=v_invoiceno and entrytype='Receipt' and isactive='1') then
@@ -874,12 +881,6 @@ if (select status from tbl_receivables where invoiceno=p_invoiceno)='Paid' then
 		select 9 as response;
 		return v_rfc;	
 end if;
-		if v_transactionstatus='TXN_SUCCESS' or v_transactionstatus='TXN_OUTSTANDING' and
-			 exists(select * from tbl_receivables where coalesce(nullif(transactionid,''),'-9999')=p_transactionid and isactive='1'::bit and invoiceno<>p_invoiceno) then
-				open v_rfc for
-				select 2 as response; -- transactionid Already exists
-				return v_rfc;
-		end if;
 LOCK TABLE tbl_receivables IN ACCESS EXCLUSIVE MODE;
 select customeraccountid,entrytype  from tbl_receivables where invoiceno=p_invoiceno and isactive='1'into v_customeraccountid,v_entrytype;
 select * from tbl_account where id=v_customeraccountid into v_tbl_account;
@@ -923,7 +924,6 @@ select * from tbl_account where id=v_customeraccountid into v_tbl_account;
 	v_tbl_receivables:=null;
 	
 		select p_json_response::json->>'STATUS' into v_transactionstatus;
-
 			update tbl_receivables
 				set transactionid=p_transactionid,
 				status=case when v_transactionstatus='TXN_SUCCESS' or v_transactionstatus='TXN_OUTSTANDING' then 'Paid' when v_transactionstatus in ('TXN_FAILURE','TXN_FAILED') then 'Failed' else status end,
@@ -1086,7 +1086,7 @@ if p_paymentmethod <> 'Verify Manual Bank Transfer' then
 		else
 		
 			/****************change 2.6 starts*************************/
-		if right(v_financialyear,4)::int<=2025 then
+		/*if right(v_financialyear,4)::int<=2025 then
 			if v_tbl_account.product_type='2' then
 					v_tallyinvoiceid:=coalesce((select max(tallyinvoiceid)from tbl_receivables where isactive='1' and financial_year=v_financialyear and left(tallyinvoicenumber,6)='HO/TP/'  and entrytype='Invoice'),0) +1;
 					v_tallyinvoicenumber:='HO/TP/'||v_finyearsuffix||'/'||v_tallyinvoiceid;
@@ -1100,14 +1100,15 @@ if p_paymentmethod <> 'Verify Manual Bank Transfer' then
 				end if;
 			end if;	
 		else
+		*/
 			if v_tbl_account.product_type='2' then
 					v_tallyinvoiceid:=coalesce((select max(tallyinvoiceid)from tbl_receivables where isactive='1' and financial_year=v_financialyear and left(tallyinvoicenumber,3)='TP/'  and entrytype='Invoice'),0) +1;
 					v_tallyinvoicenumber:='TP/'||v_finyearsuffix||'/'||v_tallyinvoiceid;
 			else
-					v_tallyinvoiceid:=coalesce((select max(tallyinvoiceid)from tbl_receivables where isactive='1' and financial_year=v_financialyear and left(tallyinvoicenumber,3)='ORP/'  and entrytype='Invoice'),0) +1;
-					v_tallyinvoicenumber:='ORP/'||v_finyearsuffix||'/'||v_tallyinvoiceid;
+					v_tallyinvoiceid:=coalesce((select max(tallyinvoiceid)from tbl_receivables where isactive='1' and financial_year=v_financialyear and left(tallyinvoicenumber,4)='EOR/'  and entrytype='Invoice'),0) +1;
+					v_tallyinvoicenumber:='EOR/'||v_finyearsuffix||'/'||v_tallyinvoiceid;
 			end if;
-		end if;	
+		--end if;	
 		
 			update tbl_receivables
 			set tallyinvoiceid=v_tallyinvoiceid,
@@ -1144,7 +1145,7 @@ if p_paymentmethod <> 'Verify Manual Bank Transfer' then
 				else
 				
 			/****************change 2.6 starts*************************/
-			
+		/*	
 		if right(v_financialyear,4)::int<=2025 then
 			if v_tbl_account.product_type='2' then
 					v_tallyinvoiceid:=coalesce((select max(tallyinvoiceid)from tbl_receivables where isactive='1' and financial_year=v_financialyear and left(tallyinvoicenumber,6)='HO/TP/'  and entrytype='Invoice'),0) +1;
@@ -1158,15 +1159,15 @@ if p_paymentmethod <> 'Verify Manual Bank Transfer' then
 					v_tallyinvoicenumber:='HO/SSE/'||v_finyearsuffix||'/'||v_tallyinvoiceid;
 				end if;
 			end if;
-		else
+		else*/
 			if v_tbl_account.product_type='2' then
 					v_tallyinvoiceid:=coalesce((select max(tallyinvoiceid)from tbl_receivables where isactive='1' and financial_year=v_financialyear and left(tallyinvoicenumber,3)='TP/'  and entrytype='Invoice'),0) +1;
 					v_tallyinvoicenumber:='TP/'||v_finyearsuffix||'/'||v_tallyinvoiceid;
 			else
-					v_tallyinvoiceid:=coalesce((select max(tallyinvoiceid)from tbl_receivables where isactive='1' and financial_year=v_financialyear and left(tallyinvoicenumber,4)='ORP/'  and entrytype='Invoice'),0) +1;
-					v_tallyinvoicenumber:='ORP/'||v_finyearsuffix||'/'||v_tallyinvoiceid;
+					v_tallyinvoiceid:=coalesce((select max(tallyinvoiceid)from tbl_receivables where isactive='1' and financial_year=v_financialyear and left(tallyinvoicenumber,4)='EOR/'  and entrytype='Invoice'),0) +1;
+					v_tallyinvoicenumber:='EOR/'||v_finyearsuffix||'/'||v_tallyinvoiceid;
 			end if;
-		end if;
+		--end if;
 			update tbl_receivables
 			set tallyinvoiceid=v_tallyinvoiceid,
 				tallyinvoicenumber=v_tallyinvoicenumber,
@@ -1207,5 +1208,5 @@ end;
 $BODY$;
 
 ALTER FUNCTION public.uspprocessreceivables(character varying, numeric, bigint, bigint, character varying, character varying, character varying, integer, numeric, text, character varying, bigint, character varying, character varying, character varying, character varying, character varying, numeric, numeric, character varying, numeric, numeric, numeric, numeric, numeric, numeric, numeric, character varying, character varying, character varying, text, bigint, character varying, bigint, character varying, numeric, character varying, integer, integer, text, text, text, text, text, text, text, numeric, character varying, numeric, numeric, numeric, numeric, character varying, character varying, character varying, character varying, character varying, character varying, character varying, character varying, character varying, character varying, character varying, integer, integer, numeric, numeric, character varying)
-    OWNER TO stagingpayrolling_app;
+    OWNER TO payrollingdb;
 
